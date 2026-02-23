@@ -64,7 +64,6 @@ export function useTrainApp() {
   const [walkingInfo, setWalkingInfo] = useState(null)
   const [homeRoutingInfo, setHomeRoutingInfo] = useState(null)
   const [trackedServiceID, setTrackedServiceIDState] = useState(null)
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const [notificationsGranted, setNotificationsGranted] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
   )
@@ -197,13 +196,6 @@ export function useTrainApp() {
     fetchTrains()
   }, [currentMode, fetchTrains])
 
-  // Auto-refresh every 3 minutes
-  useEffect(() => {
-    if (!autoRefreshEnabled) return
-    const interval = setInterval(fetchTrains, 3 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [autoRefreshEnabled, fetchTrains])
-
   const setMode = useCallback((mode) => setCurrentMode(mode), [setCurrentMode])
 
   const trackTrain = useCallback((serviceId) => {
@@ -254,8 +246,6 @@ export function useTrainApp() {
     trackedServiceID,
     trackTrain,
     fetchTrains,
-    autoRefreshEnabled,
-    setAutoRefreshEnabled,
     notificationsGranted,
     requestNotifications,
     clearCacheAndReload,

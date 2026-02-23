@@ -27,8 +27,6 @@ export default function App() {
           fetchTrains={app.fetchTrains}
           lastUpdate={app.lastUpdate}
           walkingInfo={app.walkingInfo}
-          autoRefreshEnabled={app.autoRefreshEnabled}
-          setAutoRefreshEnabled={app.setAutoRefreshEnabled}
           notificationsGranted={app.notificationsGranted}
           requestNotifications={app.requestNotifications}
           clearCacheAndReload={app.clearCacheAndReload}

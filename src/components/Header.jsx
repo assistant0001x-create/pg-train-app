@@ -5,8 +5,6 @@ export default function Header({
   fetchTrains,
   lastUpdate,
   walkingInfo,
-  autoRefreshEnabled,
-  setAutoRefreshEnabled,
   notificationsGranted,
   requestNotifications,
   clearCacheAndReload,
@@ -123,15 +121,6 @@ export default function Header({
 
         {/* Controls */}
         <div className="flex items-center gap-4 flex-wrap pt-2 border-t border-purple-500/20">
-          <label className="flex items-center gap-2 cursor-pointer text-xs text-purple-200">
-            <input
-              type="checkbox"
-              checked={autoRefreshEnabled}
-              onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
-              className="w-4 h-4 text-pink-500 rounded border-purple-500/30 bg-purple-900/30 focus:ring-pink-500 focus:ring-2"
-            />
-            <span>Auto refresh every 3 mins</span>
-          </label>
           {!notificationsGranted && (
             <button
               onClick={requestNotifications}
