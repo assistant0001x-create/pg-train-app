@@ -10,7 +10,7 @@ import {
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
-import { fetchJsonWithFallback } from '../utils/trainApi'
+import { fetchDepartures } from '../utils/trainApi'
 
 function getServiceStatus(service) {
   if (service.isCancelled) return 'cancelled'
@@ -94,11 +94,11 @@ export function useTrainApp() {
     const mode = currentModeRef.current
 
     try {
-      let fromStation, url
+      let fromStation, toCrs
 
       if (mode === 'out') {
         fromStation = PALMERS_GREEN.code
-        url = `https://huxley2.azurewebsites.net/departures/${fromStation}/to/${MOORGATE.code}/20`
+        toCrs = MOORGATE.code
         setHomeRoutingInfo(null)
       } else {
         // HOME mode — find nearest Great Northern station to the user
@@ -128,19 +128,11 @@ export function useTrainApp() {
 
         setHomeRoutingInfo({ location, nearestTrain: station, nearestTube, trainWalkMins, tubeWalkMins })
         fromStation = station.code
-        url = `https://huxley2.azurewebsites.net/departures/${fromStation}/20?expand=true`
+        toCrs = PALMERS_GREEN.code
       }
 
-      const data = await fetchJsonWithFallback(url)
-      let services = data.trainServices || []
-
-      if (mode === 'home') {
-        services = services.filter((svc) =>
-          (svc.subsequentCallingPoints || []).some((group) =>
-            (group.callingPoint || []).some((cp) => cp.crs === PALMERS_GREEN.code)
-          )
-        )
-      }
+      // calling_at filter is handled by the API — no client-side filtering needed
+      let services = await fetchDepartures(fromStation, toCrs)
 
       // Tracking notifications (out mode only)
       const tracked = trackedIDRef.current
