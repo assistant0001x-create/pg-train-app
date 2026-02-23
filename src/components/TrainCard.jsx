@@ -62,7 +62,7 @@ export default function TrainCard({ train, index, trackedServiceID, onTrack }) {
       <div className="grid grid-cols-2 gap-3 text-xs text-purple-200/70 mt-3 pt-3 border-t border-purple-500/20">
         <div>
           <span className="font-semibold text-purple-200">Platform</span>
-          <span className="ml-2">{train.platform || 'TBC'}</span>
+          <span className="ml-2">{train.platform || '—'}</span>
         </div>
         <div className="text-right">
           <span className="font-semibold text-purple-200">Operator</span>
