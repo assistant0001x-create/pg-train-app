@@ -126,7 +126,15 @@ export function useTrainApp() {
           console.warn('Could not get user location:', locErr)
         }
 
-        setHomeRoutingInfo({ location, nearestTrain: station, nearestTube, trainWalkMins, tubeWalkMins })
+        // Walk times to all tube stations (for the tube modal)
+        const tubeStationsWithWalk = location
+          ? TUBE_STATIONS.map((s) => ({
+              ...s,
+              walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
+            })).sort((a, b) => a.walkMins - b.walkMins)
+          : TUBE_STATIONS.map((s) => ({ ...s, walkMins: null }))
+
+        setHomeRoutingInfo({ location, nearestTrain: station, nearestTube, trainWalkMins, tubeWalkMins, tubeStations: tubeStationsWithWalk })
         fromStation = station.code
         toCrs = PALMERS_GREEN.code
       }

@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { useTrainApp } from './hooks/useTrainApp'
 import Header from './components/Header'
 import StatusMessage from './components/StatusMessage'
 import HomeOptions from './components/HomeOptions'
 import TrainList from './components/TrainList'
+import TransportModal from './components/TransportModal'
 
 export default function App() {
   const app = useTrainApp()
+  const [activeModal, setActiveModal] = useState(null)
 
   return (
     <div className="min-h-screen bg-animated text-slate-100 relative overflow-x-hidden">
@@ -34,7 +37,7 @@ export default function App() {
         <StatusMessage status={app.status} />
 
         {app.currentMode === 'home' && (
-          <HomeOptions homeRoutingInfo={app.homeRoutingInfo} />
+          <HomeOptions homeRoutingInfo={app.homeRoutingInfo} onOpenModal={setActiveModal} />
         )}
 
         <TrainList
@@ -46,6 +49,16 @@ export default function App() {
           homeRoutingInfo={app.homeRoutingInfo}
         />
       </div>
+
+      <TransportModal
+        activeModal={activeModal}
+        onClose={() => setActiveModal(null)}
+        trains={app.trains}
+        walkingInfo={app.walkingInfo}
+        homeRoutingInfo={app.homeRoutingInfo}
+        trackedServiceID={app.trackedServiceID}
+        onTrack={app.trackTrain}
+      />
     </div>
   )
 }
