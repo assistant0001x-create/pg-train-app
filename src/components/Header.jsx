@@ -72,7 +72,7 @@ export default function Header({
             </div>
           </div>
           <button
-            onClick={fetchTrains}
+            onClick={() => fetchTrains({ force: true })}
             className="p-3 rounded-2xl border border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 transition-all hover:scale-105 hover:border-pink-500/50 backdrop-blur-sm flex-shrink-0"
             aria-label="Refresh trains"
           >
@@ -130,7 +130,7 @@ export default function Header({
               onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
               className="w-4 h-4 text-pink-500 rounded border-purple-500/30 bg-purple-900/30 focus:ring-pink-500 focus:ring-2"
             />
-            <span>Auto refresh every minute</span>
+            <span>Auto refresh every 3 mins</span>
           </label>
           {!notificationsGranted && (
             <button

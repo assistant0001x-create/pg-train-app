@@ -88,7 +88,7 @@ export function useTrainApp() {
 
   const showStatus = useCallback((type, message) => setStatus({ type, message }), [])
 
-  const fetchTrains = useCallback(async () => {
+  const fetchTrains = useCallback(async ({ force = false } = {}) => {
     setIsLoading(true)
     setWalkingInfo(null)
     const mode = currentModeRef.current
@@ -140,7 +140,7 @@ export function useTrainApp() {
       }
 
       // calling_at filter is handled by the API — no client-side filtering needed
-      let services = await fetchDepartures(fromStation, toCrs)
+      let services = await fetchDepartures(fromStation, toCrs, { force })
 
       // Tracking notifications (out mode only)
       const tracked = trackedIDRef.current
@@ -197,10 +197,10 @@ export function useTrainApp() {
     fetchTrains()
   }, [currentMode, fetchTrains])
 
-  // Auto-refresh every minute
+  // Auto-refresh every 3 minutes
   useEffect(() => {
     if (!autoRefreshEnabled) return
-    const interval = setInterval(fetchTrains, 60000)
+    const interval = setInterval(fetchTrains, 3 * 60 * 1000)
     return () => clearInterval(interval)
   }, [autoRefreshEnabled, fetchTrains])
 
