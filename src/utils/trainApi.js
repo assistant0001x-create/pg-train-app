@@ -81,6 +81,68 @@ function secondsToTimeString(secs) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+const BUS_ROUTES_HOME = ['329', '121', 'w6', '34', '184', '299', '298', '102']
+
+// Find nearby bus stops and return live arrivals grouped by route
+export async function fetchNearbyBusOptions(lat, lon) {
+  if (!TFL_KEY) return []
+
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lon: String(lon),
+    stopTypes: 'NaptanPublicBusCoachTram',
+    radius: '400',
+    useStopPointHierarchy: 'false',
+    app_key: TFL_KEY,
+  })
+  const res = await fetch(`${TFL_BASE}/StopPoint?${params}`)
+  if (!res.ok) return []
+
+  const data = await res.json()
+  const stops = data.stopPoints || []
+
+  // Map route → nearest stop (TfL returns stops sorted by distance)
+  const routeToStop = new Map()
+  for (const stop of stops) {
+    for (const line of stop.lines) {
+      if (BUS_ROUTES_HOME.includes(line.id) && !routeToStop.has(line.id)) {
+        routeToStop.set(line.id, { id: stop.id, name: stop.commonName, lat: stop.lat, lon: stop.lon })
+      }
+    }
+  }
+  if (routeToStop.size === 0) return []
+
+  // Fetch arrivals per unique stop (one call can cover multiple routes at same stop)
+  const uniqueStopIds = [...new Set([...routeToStop.values()].map((s) => s.id))]
+  const arrivalsByStop = new Map()
+  await Promise.all(
+    uniqueStopIds.map(async (id) => {
+      try {
+        const r = await fetch(`${TFL_BASE}/StopPoint/${id}/Arrivals?app_key=${TFL_KEY}`)
+        if (r.ok) arrivalsByStop.set(id, await r.json())
+      } catch { /* ignore */ }
+    })
+  )
+
+  // Build one result per route
+  return [...routeToStop.entries()].flatMap(([routeId, stop]) => {
+    const allArrivals = arrivalsByStop.get(stop.id) || []
+    const departures = allArrivals
+      .filter((a) => a.lineName && a.lineName.toLowerCase() === routeId.toLowerCase())
+      .sort((a, b) => a.timeToStation - b.timeToStation)
+      .slice(0, 6)
+      .map((a) => ({
+        std: secondsToTimeString(a.timeToStation),
+        etd: 'On time',
+        isCancelled: false,
+        serviceID: a.vehicleId || String(a.timeToStation),
+        serviceId: a.vehicleId || String(a.timeToStation),
+      }))
+    if (departures.length === 0) return []
+    return [{ route: routeId.toUpperCase(), stop, departures }]
+  })
+}
+
 // Fetch westbound Piccadilly line arrivals (toward central London / King's Cross)
 export async function fetchTubeArrivals(naptanId) {
   if (!TFL_KEY) throw new Error('TfL API key not configured.')

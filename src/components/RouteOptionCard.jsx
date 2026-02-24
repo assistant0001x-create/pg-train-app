@@ -42,9 +42,11 @@ const BADGE_LABELS = {
 }
 
 function ModeBadge({ line, type }) {
-  const bg = BADGE_STYLES[line] || 'bg-purple-700 text-white'
-  const label = BADGE_LABELS[line] || line.slice(0, 4)
-  const icon = type === 'train' ? '🚆' : '🚇'
+  const bg = type === 'bus'
+    ? 'bg-[#E1251B] text-white'
+    : (BADGE_STYLES[line] || 'bg-purple-700 text-white')
+  const label = type === 'bus' ? line : (BADGE_LABELS[line] || line.slice(0, 4))
+  const icon = type === 'train' ? '🚆' : type === 'bus' ? '🚌' : '🚇'
 
   return (
     <span

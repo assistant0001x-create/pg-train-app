@@ -7,10 +7,11 @@ import {
   HOME_ADDRESS,
   MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
+  TUBE_STATION_BUS_ROUTES,
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
-import { fetchDepartures, fetchTubeArrivals } from '../utils/trainApi'
+import { fetchDepartures, fetchTubeArrivals, fetchNearbyBusOptions } from '../utils/trainApi'
 import { getDummyRouteOptions } from '../utils/dummyData'
 
 // Set VITE_DUMMY_MODE=false in .env to use the live API
@@ -210,7 +211,40 @@ export function useTrainApp() {
           })
         )
 
-        setRouteOptions([trainOption, ...tubeOptions])
+        // Fetch live bus options near user's GPS location
+        let busOptions = []
+        if (location) {
+          try {
+            const busData = await fetchNearbyBusOptions(location.lat, location.lon)
+            busOptions = busData.map(({ route, stop, departures }) => {
+              const stopWalkMins = walkingMinutes(location.lat, location.lon, stop.lat, stop.lon)
+              const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
+              // If this route serves a tube station >15 min walk, label it as "bus to station"
+              const farTubeStation = tubeStationsWithWalk.find(
+                (ts) =>
+                  ts.naptanId &&
+                  (ts.walkMins ?? 0) > 15 &&
+                  (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
+              )
+              return {
+                id: `bus-${route.toLowerCase()}-${stop.id}`,
+                type: 'bus',
+                station: { name: stop.name, line: route },
+                walkMins: stopWalkMins,
+                journeyMins: null,
+                destination: farTubeStation ? farTubeStation.name : 'Palmers Green',
+                line: route,
+                operator: 'TfL',
+                mapsUrl: stopMapsUrl,
+                departures,
+              }
+            })
+          } catch (e) {
+            console.warn('Bus options failed:', e)
+          }
+        }
+
+        setRouteOptions([trainOption, ...tubeOptions, ...busOptions])
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')

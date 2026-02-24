@@ -31,3 +31,14 @@ export const HOME_ADDRESS = import.meta.env.VITE_HOME_ADDRESS || ''
 
 export const MAX_WALK_MINUTES = 15
 export const DEPARTURE_NOTIFY_MINUTES = 15
+
+// Bus routes that serve the N13 / Palmers Green area
+export const BUS_ROUTES_HOME = ['329', '121', 'w6', '34', '184', '299', '298', '102']
+
+// Bus routes that stop near each Piccadilly tube station
+// Used to suggest "bus to station" when the station is >15 min walk
+export const TUBE_STATION_BUS_ROUTES = {
+  '940GZZLUASG': ['184', '34', '121'],        // Arnos Grove
+  '940GZZLUBDS': ['184', '299', '102'],        // Bounds Green
+  '940GZZLUSGT': ['121', 'w6', '298', '299'], // Southgate
+}
