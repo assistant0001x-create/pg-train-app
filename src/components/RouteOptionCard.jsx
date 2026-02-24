@@ -28,6 +28,14 @@ function firstCatchable(departures, walkMins) {
     .find((m) => m >= (walkMins ?? 0)) ?? null
 }
 
+const MODE_ICON = {
+  walk: null,
+  tube: '/icons/underground.svg',
+  train: '/icons/train.svg',
+  overground: '/icons/train.svg',
+  bus: '/icons/bus.svg',
+}
+
 function getStepTokens(option) {
   switch (option.type) {
     case 'tube+train':
@@ -44,12 +52,11 @@ function getStepTokens(option) {
   }
 }
 
-const STEP_ICON = {
-  walk: '🚶',
-  tube: '🚇',
-  train: '🚆',
-  overground: '🚂',
-  bus: '🚌',
+function ModeGlyph({ mode }) {
+  if (mode === 'walk') {
+    return <span className="text-2xl leading-none">🚶</span>
+  }
+  return <img src={MODE_ICON[mode]} alt={mode} className="w-8 h-8 object-contain" />
 }
 
 function StepStrip({ option }) {
@@ -58,8 +65,8 @@ function StepStrip({ option }) {
     <div className="flex items-center gap-2 flex-wrap">
       {steps.map((step, i) => (
         <div key={`${step}-${i}`} className="inline-flex items-center">
-          <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 w-9 h-9 text-xl" aria-label={step}>
-            {STEP_ICON[step]}
+          <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 w-11 h-11">
+            <ModeGlyph mode={step} />
           </span>
           {i < steps.length - 1 && <span className="mx-1 text-slate-300 text-sm">•</span>}
         </div>
@@ -68,37 +75,45 @@ function StepStrip({ option }) {
   )
 }
 
-function JourneySummary({ type, station, destination, walkMins, journeyMins, mapsUrl, serviceNote }) {
-  const isTubeType = type === 'tube' || type === 'tube+train' || type === 'overground'
+function durationLabel(mins) {
+  return mins != null && mins > 0 ? `${mins} min` : '—'
+}
 
-  let text
-  if (type === 'tube+train') {
-    text = `Walk/tube to ${station.name}, then Great Northern to ${destination}`
-  } else if (isTubeType) {
-    const walkLabel = journeyMins != null ? `${journeyMins} min walk` : 'Walk'
-    text = `Alight at ${station.name} → ${walkLabel} to ${destination}`
-  } else {
-    text = walkMins != null ? `${walkMins} min walk to ${station.name} → ${destination}` : `Walk to ${station.name} → ${destination}`
+function buildStages(option) {
+  const destStation = option.destination || 'Palmers Green'
+  switch (option.type) {
+    case 'tube+train':
+      return [
+        { mode: 'tube', from: 'Current location', to: option.station.name, mins: null },
+        { mode: 'train', from: option.station.name, to: destStation, mins: option.journeyMins },
+      ]
+    case 'tube':
+      return [
+        { mode: 'tube', from: 'Current location', to: option.station.name, mins: null },
+        { mode: 'walk', from: option.station.name, to: destStation, mins: option.journeyMins },
+      ]
+    case 'overground':
+      return [
+        { mode: 'overground', from: 'Current location', to: option.station.name, mins: null },
+        { mode: 'bus', from: option.station.name, to: destStation, mins: null },
+      ]
+    case 'bus':
+      return [
+        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins },
+        { mode: 'bus', from: option.station.name, to: destStation, mins: null },
+      ]
+    case 'train':
+    default:
+      return [
+        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins },
+        { mode: 'train', from: option.station.name, to: destStation, mins: option.journeyMins },
+      ]
   }
-
-  return (
-    <div className="flex items-center gap-1.5 mb-3">
-      <span className="text-xs leading-none">{isTubeType ? '🚇' : '🚶'}</span>
-      {mapsUrl ? (
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-slate-500 hover:text-slate-700 transition-colors underline underline-offset-2">
-          {text}
-        </a>
-      ) : (
-        <span className="text-[11px] text-slate-500">{text}</span>
-      )}
-      {serviceNote && isTubeType && <span className="text-[10px] text-slate-400 italic ml-1">— {serviceNote}</span>}
-    </div>
-  )
 }
 
 export default function RouteOptionCard({ option, isLast }) {
   const [expanded, setExpanded] = useState(false)
-  const { station, walkMins, journeyMins, departures, mapsUrl, serviceNote } = option
+  const { station, walkMins, journeyMins, departures, serviceNote } = option
 
   const nextThree = departures
     .filter((d) => !d.isCancelled)
@@ -115,12 +130,13 @@ export default function RouteOptionCard({ option, isLast }) {
 
   const catchMin = journeyMins != null ? firstCatchable(departures, walkMins) : null
   const total = catchMin != null && journeyMins != null ? catchMin + journeyMins : null
+  const stages = buildStages(option)
 
   return (
     <div className={!isLast ? 'border-b border-slate-200' : ''}>
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full min-h-[72px] flex flex-col justify-center px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
+        className="w-full min-h-[84px] flex flex-col justify-center px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors text-left"
       >
         <div className="flex items-start justify-between gap-3 w-full">
           <div className="flex-1">
@@ -133,29 +149,28 @@ export default function RouteOptionCard({ option, isLast }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {total != null && (
-              <div className="text-right">
-                <div className="text-xl font-bold text-slate-900 leading-none">{total}</div>
-                <div className="text-[10px] text-slate-500">min</div>
-              </div>
-            )}
-            <span className="text-slate-300 text-[9px]">{expanded ? '▲' : '▼'}</span>
-          </div>
+          <span className="text-slate-300 text-[9px] mt-1">{expanded ? '▲' : '▼'}</span>
         </div>
       </button>
 
       {expanded && (
         <div className="px-4 pb-4 pt-2 bg-slate-50/70">
-          <JourneySummary
-            type={option.type}
-            station={option.station}
-            destination={option.destination}
-            walkMins={option.walkMins}
-            journeyMins={option.journeyMins}
-            mapsUrl={mapsUrl}
-            serviceNote={serviceNote}
-          />
+          <p className="text-[11px] text-slate-500 mb-2">Journey stages</p>
+          <div className="space-y-2 mb-3">
+            {stages.map((stage, idx) => (
+              <div key={`${stage.mode}-${idx}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <ModeGlyph mode={stage.mode} />
+                  <div className="text-xs text-slate-700 truncate">
+                    <span className="font-semibold">{stage.from}</span>
+                    <span className="text-slate-400 mx-1">→</span>
+                    <span className="font-semibold">{stage.to}</span>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-slate-600 ml-2">{durationLabel(stage.mins)}</span>
+              </div>
+            ))}
+          </div>
 
           {departures.length === 0 && serviceNote && <p className="text-[11px] text-slate-500 italic mt-1">{serviceNote}</p>}
 

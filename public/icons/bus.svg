@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Bus">
+  <circle cx="32" cy="32" r="24" fill="none" stroke="#DC241F" stroke-width="10"/>
+  <rect x="10" y="27" width="44" height="10" rx="1" fill="#0019A8"/>
+  <text x="32" y="35" text-anchor="middle" font-size="7" font-family="Arial, sans-serif" fill="#fff" font-weight="700">BUS</text>
+</svg>

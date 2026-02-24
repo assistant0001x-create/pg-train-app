@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Rail">
+  <rect x="6" y="16" width="52" height="32" rx="6" fill="#7C1F3A"/>
+  <path d="M14 32h36" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M16 24l10 8-10 8" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48 24l-10 8 10 8" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
