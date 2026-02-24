@@ -126,7 +126,7 @@ export default function RouteOptionCard({ option, isLast }) {
           <div className="flex-1">
             <StepStrip option={option} />
             <div className="mt-1.5 text-xs text-slate-700 leading-tight font-medium">
-              {station.name} → {option.destination}
+              Duration: {total != null ? `${total} min` : 'calculating…'}
             </div>
             <div className="mt-1 text-[11px] text-slate-500 leading-tight">
               {depsStr} from {station.name}
