@@ -8,9 +8,7 @@ import {
   HOME_ADDRESS,
   MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
-  TUBE_STATION_BUS_ROUTES,
   OVERGROUND_STATIONS,
-  OVERGROUND_STATION_BUS_ROUTES,
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
@@ -300,14 +298,6 @@ export function useTrainApp() {
             busOptions = busData.map(({ route, stop, departures }) => {
               const stopWalkMins = walkingMinutes(location.lat, location.lon, stop.lat, stop.lon)
               const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
-              // If this bus serves a near-home tube/overground station, label it accordingly
-              const linkedStation =
-                TUBE_STATIONS.find(
-                  (ts) => (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
-                ) ||
-                OVERGROUND_STATIONS.find(
-                  (os) => (OVERGROUND_STATION_BUS_ROUTES[os.naptanId] || []).includes(route.toLowerCase())
-                )
               return {
                 id: `bus-${route.toLowerCase()}-${stop.id}`,
                 type: 'bus',
