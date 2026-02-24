@@ -33,6 +33,7 @@ jobs:
         run: npm run build
         env:
           GITHUB_ACTIONS: true
+          VITE_DUMMY_MODE: false
           VITE_HOME_ADDRESS: ${{ secrets.VITE_HOME_ADDRESS }}
           VITE_TRANSPORTAPI_APP_ID: ${{ secrets.VITE_TRANSPORTAPI_APP_ID }}
           VITE_TRANSPORTAPI_APP_KEY: ${{ secrets.VITE_TRANSPORTAPI_APP_KEY }}

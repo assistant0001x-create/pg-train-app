@@ -16,6 +16,20 @@ import { getDummyRouteOptions } from '../utils/dummyData'
 // Set VITE_DUMMY_MODE=false in .env to use the live API
 const DUMMY_MODE = import.meta.env.VITE_DUMMY_MODE !== 'false'
 
+// Approximate train journey times (minutes) from each GN station to Palmers Green
+const JOURNEY_MINS_TO_PAL = {
+  MOG: 30, OLD: 27, EXR: 24, HBY: 21, DRN: 18,
+  FPK: 15, HRY: 12, HPY: 9,  ALX: 6,  BVP: 4,
+  WGC: 4,  GAN: 6,  ENF: 9,  GNT: 12, CWN: 15, CHN: 18,
+}
+
+// Approximate Piccadilly tube journey times (minutes) to King's Cross St. Pancras
+const JOURNEY_MINS_TO_KGX = {
+  'Arnos Grove': 22,
+  'Bounds Green': 20,
+  'Southgate': 25,
+}
+
 function getServiceStatus(service) {
   if (service.isCancelled) return 'cancelled'
   const scheduled = service.std || service.sta
@@ -113,12 +127,12 @@ export function useTrainApp() {
         showStatus('info', 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
         return
       } else {
-        // HOME mode — find nearest Great Northern station to the user
+        // LIVE HOME mode — self-contained: fetches, builds routeOptions, returns early
         let station = GREAT_NORTHERN_STATIONS.find((s) => s.code === 'FPK') || GREAT_NORTHERN_STATIONS[0]
         let location = null
         let trainWalkMins = null
-        let nearestTube = null
-        let tubeWalkMins = null
+        let trainMapsUrl = null
+        let tubeStationsWithWalk = []
 
         try {
           location = await getUserLocation()
@@ -126,31 +140,70 @@ export function useTrainApp() {
           if (nearest) station = nearest
           trainWalkMins = walkingMinutes(location.lat, location.lon, station.lat, station.lon)
           const travelMode = trainWalkMins <= MAX_WALK_MINUTES ? 'walking' : 'transit'
-          const mapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
-          setWalkingInfo({ trainWalkMins, station, mapsUrl, travelMode, locationError: false })
-          nearestTube = getNearestLocation(location, TUBE_STATIONS)
-          if (nearestTube) {
-            tubeWalkMins = walkingMinutes(location.lat, location.lon, nearestTube.lat, nearestTube.lon)
-          }
+          trainMapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
+          setWalkingInfo({ trainWalkMins, station, mapsUrl: trainMapsUrl, travelMode, locationError: false })
+          tubeStationsWithWalk = TUBE_STATIONS.map((s) => ({
+            ...s,
+            walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
+            mapsUrl: buildMapsUrl(location, `${s.lat},${s.lon}`, 'walking'),
+          })).sort((a, b) => a.walkMins - b.walkMins)
         } catch (locErr) {
-          const mapsUrl = buildMapsUrl(null, `${station.lat},${station.lon}`, 'walking')
-          setWalkingInfo({ trainWalkMins: null, station, mapsUrl, travelMode: 'walking', locationError: true })
+          trainMapsUrl = buildMapsUrl(null, `${station.lat},${station.lon}`, 'walking')
+          setWalkingInfo({ trainWalkMins: null, station, mapsUrl: trainMapsUrl, travelMode: 'walking', locationError: true })
           console.warn('Could not get user location:', locErr)
         }
 
-        // Walk times to all tube stations (for the tube modal)
-        const tubeStationsWithWalk = location
-          ? TUBE_STATIONS.map((s) => ({
-              ...s,
-              walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
-            })).sort((a, b) => a.walkMins - b.walkMins)
-          : TUBE_STATIONS.map((s) => ({ ...s, walkMins: null }))
+        setHomeRoutingInfo({
+          location,
+          nearestTrain: station,
+          nearestTube: tubeStationsWithWalk[0] || null,
+          trainWalkMins,
+          tubeWalkMins: tubeStationsWithWalk[0]?.walkMins || null,
+          tubeStations: tubeStationsWithWalk,
+        })
 
-        setHomeRoutingInfo({ location, nearestTrain: station, nearestTube, trainWalkMins, tubeWalkMins, tubeStations: tubeStationsWithWalk })
-        fromStation = station.code
-        toCrs = PALMERS_GREEN.code
+        // Fetch live GN departures (one API call)
+        const services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
+
+        // Build GN train route option
+        const trainOption = {
+          id: `train-${station.code}`,
+          type: 'train',
+          station: { code: station.code, name: station.name },
+          walkMins: trainWalkMins,
+          journeyMins: JOURNEY_MINS_TO_PAL[station.code] || null,
+          destination: PALMERS_GREEN.name,
+          line: 'Great Northern',
+          operator: 'Great Northern',
+          mapsUrl: trainMapsUrl,
+          departures: services,
+        }
+
+        // Build Piccadilly tube options (walk + estimated journey, no live departures)
+        const tubeOptions = tubeStationsWithWalk
+          .filter((ts) => ts.walkMins != null && ts.walkMins <= 25)
+          .map((ts) => ({
+            id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
+            type: 'tube',
+            station: { name: ts.name, line: ts.line },
+            walkMins: ts.walkMins,
+            journeyMins: JOURNEY_MINS_TO_KGX[ts.name] || null,
+            destination: "King's Cross St. Pancras",
+            line: ts.line,
+            operator: 'TfL',
+            mapsUrl: ts.mapsUrl || null,
+            departures: [],
+            serviceNote: 'Check TfL app for live times',
+          }))
+
+        setRouteOptions([trainOption, ...tubeOptions])
+        setTrains(services.slice(0, 12))
+        setLastUpdate(new Date())
+        showStatus('success', 'Connected. Showing live Great Northern departures.')
+        return
       }
 
+      // ── OUT mode only below this point ───────────────────────────────────
       // calling_at filter is handled by the API — no client-side filtering needed
       let services = await fetchDepartures(fromStation, toCrs, { force })
 

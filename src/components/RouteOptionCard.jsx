@@ -88,7 +88,7 @@ function TotalTime({ walkMins, journeyMins, departures }) {
 
 export default function RouteOptionCard({ option, isLast }) {
   const [expanded, setExpanded] = useState(false)
-  const { type, station, walkMins, journeyMins, destination, line, departures, mapsUrl } = option
+  const { type, station, walkMins, journeyMins, destination, line, departures, mapsUrl, serviceNote } = option
 
   // "in 4, 19, 34 min" — next 3 non-cancelled countdowns
   const nextThree = departures
@@ -100,8 +100,9 @@ export default function RouteOptionCard({ option, isLast }) {
     })
     .filter((m) => m !== null)
 
-  const depsStr =
-    nextThree.length > 0 ? `in ${nextThree.join(', ')} min` : 'No services'
+  const depsStr = departures.length > 0
+    ? (nextThree.length > 0 ? `in ${nextThree.join(', ')} min` : 'No services')
+    : (serviceNote || 'No live data')
 
   return (
     <div className={!isLast ? 'border-b border-purple-500/10' : ''}>
@@ -160,6 +161,11 @@ export default function RouteOptionCard({ option, isLast }) {
               </span>
             )}
           </div>
+
+          {/* No-data note for tube options */}
+          {departures.length === 0 && serviceNote && (
+            <p className="text-[11px] text-purple-300/45 italic mt-1">{serviceNote}</p>
+          )}
 
           {/* Timetable rows */}
           {departures.map((dep, i) => {
