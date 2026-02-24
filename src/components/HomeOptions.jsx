@@ -1,36 +1,31 @@
-export default function HomeOptions({ homeRoutingInfo, onOpenModal }) {
-  if (!homeRoutingInfo) return null
+import RouteOptionCard from './RouteOptionCard'
 
-  const { trainWalkMins, nearestTrain, tubeStations } = homeRoutingInfo
-  const nearestTube = tubeStations?.[0]
+export default function HomeOptions({ routeOptions, isLoading }) {
+  if (isLoading && (!routeOptions || routeOptions.length === 0)) {
+    return (
+      <div className="glass-card rounded-2xl p-6 text-center text-purple-300/60 mb-4">
+        <p className="text-sm">Finding routes near you…</p>
+      </div>
+    )
+  }
 
-  const trainSub = nearestTrain
-    ? `${trainWalkMins != null ? `${trainWalkMins} min walk · ` : ''}${nearestTrain.name}`
-    : 'Great Northern'
-
-  const tubeSub = nearestTube
-    ? `${nearestTube.walkMins != null ? `${nearestTube.walkMins} min walk · ` : ''}${nearestTube.name}`
-    : 'Piccadilly Line'
+  if (!routeOptions || routeOptions.length === 0) return null
 
   return (
-    <div className="flex gap-3 mb-4">
-      <button
-        onClick={() => onOpenModal('train')}
-        className="flex-1 glass-card rounded-2xl px-4 py-4 border border-purple-500/30 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all text-left active:scale-95"
-      >
-        <div className="text-xl mb-1">🚆</div>
-        <div className="text-sm font-semibold text-white">Train</div>
-        <div className="text-[11px] text-purple-300/70 truncate mt-0.5">{trainSub}</div>
-      </button>
+    <div className="mb-5">
+      {/* Plain section header — outside the panel, like CityMapper */}
+      <p className="text-sm font-semibold text-purple-200/50 mb-2 px-1">Suggested</p>
 
-      <button
-        onClick={() => onOpenModal('tube')}
-        className="flex-1 glass-card rounded-2xl px-4 py-4 border border-purple-500/30 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all text-left active:scale-95"
-      >
-        <div className="text-xl mb-1">🚇</div>
-        <div className="text-sm font-semibold text-white">Underground</div>
-        <div className="text-[11px] text-purple-300/70 truncate mt-0.5">{tubeSub}</div>
-      </button>
+      {/* All routes in one glass panel */}
+      <div className="glass-card rounded-2xl overflow-hidden">
+        {routeOptions.map((option, i) => (
+          <RouteOptionCard
+            key={option.id}
+            option={option}
+            isLast={i === routeOptions.length - 1}
+          />
+        ))}
+      </div>
     </div>
   )
 }

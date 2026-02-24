@@ -35,17 +35,19 @@ export default function App() {
         <StatusMessage status={app.status} />
 
         {app.currentMode === 'home' && (
-          <HomeOptions homeRoutingInfo={app.homeRoutingInfo} onOpenModal={setActiveModal} />
+          <HomeOptions routeOptions={app.routeOptions} isLoading={app.isLoading} />
         )}
 
-        <TrainList
-          trains={app.trains}
-          isLoading={app.isLoading}
-          trackedServiceID={app.trackedServiceID}
-          onTrack={app.trackTrain}
-          currentMode={app.currentMode}
-          homeRoutingInfo={app.homeRoutingInfo}
-        />
+        {app.currentMode === 'out' && (
+          <TrainList
+            trains={app.trains}
+            isLoading={app.isLoading}
+            trackedServiceID={app.trackedServiceID}
+            onTrack={app.trackTrain}
+            currentMode={app.currentMode}
+            homeRoutingInfo={app.homeRoutingInfo}
+          />
+        )}
       </div>
 
       <TransportModal

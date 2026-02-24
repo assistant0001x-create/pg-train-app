@@ -11,6 +11,10 @@ import {
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
 import { fetchDepartures } from '../utils/trainApi'
+import { getDummyRouteOptions } from '../utils/dummyData'
+
+// Set VITE_DUMMY_MODE=false in .env to use the live API
+const DUMMY_MODE = import.meta.env.VITE_DUMMY_MODE !== 'false'
 
 function getServiceStatus(service) {
   if (service.isCancelled) return 'cancelled'
@@ -63,6 +67,7 @@ export function useTrainApp() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [walkingInfo, setWalkingInfo] = useState(null)
   const [homeRoutingInfo, setHomeRoutingInfo] = useState(null)
+  const [routeOptions, setRouteOptions] = useState([])
   const [trackedServiceID, setTrackedServiceIDState] = useState(null)
   const [notificationsGranted, setNotificationsGranted] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
@@ -99,6 +104,14 @@ export function useTrainApp() {
         fromStation = PALMERS_GREEN.code
         toCrs = MOORGATE.code
         setHomeRoutingInfo(null)
+        setRouteOptions([])
+      } else if (DUMMY_MODE) {
+        // Offline demo — no API calls
+        setRouteOptions(getDummyRouteOptions())
+        setTrains([])
+        setLastUpdate(new Date())
+        showStatus('info', 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
+        return
       } else {
         // HOME mode — find nearest Great Northern station to the user
         let station = GREAT_NORTHERN_STATIONS.find((s) => s.code === 'FPK') || GREAT_NORTHERN_STATIONS[0]
@@ -238,6 +251,7 @@ export function useTrainApp() {
     currentMode,
     setMode,
     trains,
+    routeOptions,
     isLoading,
     status,
     lastUpdate,
