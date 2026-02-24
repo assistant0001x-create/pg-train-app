@@ -29,11 +29,11 @@ function firstCatchable(departures, walkMins) {
 }
 
 const MODE_ICON = {
-  walk: null,
-  tube: '/icons/underground.svg',
-  train: '/icons/train.svg',
-  overground: '/icons/train.svg',
-  bus: '/icons/bus.svg',
+  walk: '🚶',
+  tube: 'tube',
+  train: 'train',
+  overground: 'overground',
+  bus: 'bus',
 }
 
 function getStepTokens(option) {
@@ -54,9 +54,35 @@ function getStepTokens(option) {
 
 function ModeGlyph({ mode }) {
   if (mode === 'walk') {
-    return <span className="text-2xl leading-none">🚶</span>
+    return <span className="text-2xl leading-none">{MODE_ICON.walk}</span>
   }
-  return <img src={MODE_ICON[mode]} alt={mode} className="w-8 h-8 object-contain" />
+
+  if (mode === 'tube') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-8 h-8" aria-label="Underground" role="img">
+        <circle cx="32" cy="32" r="24" fill="none" stroke="#E32017" strokeWidth="10" />
+        <rect x="8" y="27" width="48" height="10" rx="1" fill="#003688" />
+      </svg>
+    )
+  }
+
+  if (mode === 'bus') {
+    return (
+      <svg viewBox="0 0 64 64" className="w-8 h-8" aria-label="Bus" role="img">
+        <circle cx="32" cy="32" r="24" fill="none" stroke="#DC241F" strokeWidth="10" />
+        <rect x="10" y="27" width="44" height="10" rx="1" fill="#0019A8" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg viewBox="0 0 64 64" className="w-8 h-8" aria-label="Rail" role="img">
+      <rect x="6" y="16" width="52" height="32" rx="6" fill="#7C1F3A" />
+      <path d="M14 32h36" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+      <path d="M16 24l10 8-10 8" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M48 24l-10 8 10 8" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
 }
 
 function StepStrip({ option }) {
