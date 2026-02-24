@@ -35,8 +35,7 @@ jobs:
           GITHUB_ACTIONS: true
           VITE_DUMMY_MODE: false
           VITE_HOME_ADDRESS: ${{ secrets.VITE_HOME_ADDRESS }}
-          VITE_TRANSPORTAPI_APP_ID: ${{ secrets.VITE_TRANSPORTAPI_APP_ID }}
-          VITE_TRANSPORTAPI_APP_KEY: ${{ secrets.VITE_TRANSPORTAPI_APP_KEY }}
+          VITE_RDG_API_KEY: ${{ secrets.VITE_RDG_API_KEY }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,26 +1,18 @@
-const APP_ID = import.meta.env.VITE_TRANSPORTAPI_APP_ID
-const APP_KEY = import.meta.env.VITE_TRANSPORTAPI_APP_KEY
-const BASE = 'https://transportapi.com/v3/uk/train'
+// Rail Delivery Group — Live Departure Board API
+// https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120/GetDepartureBoard
+const API_KEY = import.meta.env.VITE_RDG_API_KEY
+const BASE = 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120/GetDepartureBoard'
 
 function transformService(svc) {
-  const isCancelled = svc.status === 'CANCELLED'
-  const aimed = svc.aimed_departure_time       // "HH:MM"
-  const expected = svc.expected_departure_time // "HH:MM" or null
-
-  // Show expected time only when it differs from scheduled (late or early)
-  let etd = 'On time'
-  if (!isCancelled && expected && expected !== aimed) {
-    etd = expected
-  }
-
+  // RDG already returns std/etd/isCancelled/platform/operator/serviceID directly
   return {
-    std: aimed || 'TBC',
-    etd,
-    isCancelled,
-    platform: svc.platform,
-    operator: svc.operator_name || svc.operator,
-    serviceID: svc.train_uid,
-    serviceId: svc.train_uid,
+    std: svc.std || 'TBC',
+    etd: svc.etd || 'On time',
+    isCancelled: svc.isCancelled || false,
+    platform: svc.platform || '—',
+    operator: svc.operator || '',
+    serviceID: svc.serviceID,
+    serviceId: svc.serviceID,
   }
 }
 
@@ -51,7 +43,7 @@ function writeCache(fromCrs, toCrs, data) {
 }
 
 export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
-  if (!APP_ID || !APP_KEY) throw new Error('TransportAPI credentials not configured.')
+  if (!API_KEY) throw new Error('RDG API key not configured.')
 
   if (!force) {
     const cached = readCache(fromCrs, toCrs)
@@ -59,22 +51,23 @@ export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
   }
 
   const params = new URLSearchParams({
-    app_id: APP_ID,
-    app_key: APP_KEY,
-    train_status: 'passenger',
-    calling_at: toCrs,
+    numRows: '12',
+    filterCrs: toCrs,
+    filterType: 'to',
   })
 
-  const res = await fetch(`${BASE}/station/${fromCrs}/live.json?${params}`)
+  const res = await fetch(`${BASE}/${fromCrs}?${params}`, {
+    headers: { 'x-apikey': API_KEY },
+  })
+
   if (!res.ok) {
-    if (res.status === 403) {
-      throw new Error('Daily API limit reached. Try again in a few hours.')
-    }
-    throw new Error(`TransportAPI error: ${res.status}`)
+    if (res.status === 401 || res.status === 403) throw new Error('RDG API key invalid or unauthorised.')
+    if (res.status === 429) throw new Error('Rate limit reached. Please wait a moment.')
+    throw new Error(`RDG API error: ${res.status}`)
   }
 
   const data = await res.json()
-  const services = (data.departures?.all || []).map(transformService)
+  const services = (data.trainServices || []).map(transformService)
   writeCache(fromCrs, toCrs, services)
   return services
 }
