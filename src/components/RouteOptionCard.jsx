@@ -48,7 +48,7 @@ function ModeBadge({ line, type }) {
     ? 'bg-[#E1251B] text-white'
     : (BADGE_STYLES[line] || 'bg-purple-700 text-white')
   const label = type === 'bus' ? line : (BADGE_LABELS[line] || line.slice(0, 4))
-  const icon = type === 'train' ? '🚆' : type === 'bus' ? '🚌' : type === 'overground' ? '🚂' : '🚇'
+  const icon = type === 'train' || type === 'tube+train' ? '🚆' : type === 'bus' ? '🚌' : type === 'overground' ? '🚂' : '🚇'
 
   return (
     <span
@@ -56,6 +56,17 @@ function ModeBadge({ line, type }) {
     >
       <span className="text-[11px] leading-none">{icon}</span>
       {label}
+    </span>
+  )
+}
+
+// Tube + Train: Piccadilly badge → GN badge
+function TubePlusTrainBadge({ tubeLine, trainLine }) {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <ModeBadge line={tubeLine} type="tube" />
+      <span className="text-purple-300/40 text-[9px] mx-0.5">→</span>
+      <ModeBadge line={trainLine} type="train" />
     </span>
   )
 }
@@ -88,11 +99,51 @@ function TotalTime({ walkMins, journeyMins, departures }) {
   )
 }
 
+// ── Journey summary line (expanded view) ───────────────────────────────────
+
+function JourneySummary({ type, station, destination, walkMins, journeyMins, mapsUrl, serviceNote }) {
+  // For tube/overground/tube+train: departures are at the alight-here station;
+  // the walk is FROM that station to home — flip the description.
+  const isTubeType = type === 'tube' || type === 'tube+train' || type === 'overground'
+
+  let text
+  if (type === 'tube+train') {
+    text = `Take Piccadilly to ${station.name}, then GN train to ${destination}`
+  } else if (isTubeType) {
+    const walkLabel = journeyMins != null ? `${journeyMins} min walk` : 'Walk'
+    text = `Alight at ${station.name} → ${walkLabel} to ${destination}`
+  } else {
+    // train / bus
+    text = walkMins != null ? `${walkMins} min walk to ${station.name} → ${destination}` : `Walk to ${station.name} → ${destination}`
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 mb-3">
+      <span className="text-xs leading-none">{isTubeType ? '🚇' : '🚶'}</span>
+      {mapsUrl ? (
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[11px] text-purple-300/55 hover:text-purple-200/80 transition-colors underline underline-offset-2"
+        >
+          {text}
+        </a>
+      ) : (
+        <span className="text-[11px] text-purple-300/50">{text}</span>
+      )}
+      {serviceNote && isTubeType && (
+        <span className="text-[10px] text-purple-300/35 italic ml-1">— {serviceNote}</span>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function RouteOptionCard({ option, isLast }) {
   const [expanded, setExpanded] = useState(false)
-  const { type, station, walkMins, journeyMins, destination, line, departures, mapsUrl, serviceNote } = option
+  const { type, station, walkMins, journeyMins, destination, line, tubeLine, departures, mapsUrl, serviceNote } = option
 
   // "in 4, 19, 34 min" — next 3 non-cancelled countdowns
   const nextThree = departures
@@ -108,6 +159,14 @@ export default function RouteOptionCard({ option, isLast }) {
     ? (nextThree.length > 0 ? `in ${nextThree.join(', ')} min` : 'No services')
     : (serviceNote || 'No live data')
 
+  // Badge row: tube+train gets dual badge, others get single
+  const badgeEl = type === 'tube+train'
+    ? <TubePlusTrainBadge tubeLine={tubeLine || 'Piccadilly'} trainLine={line} />
+    : <ModeBadge line={line} type={type} />
+
+  // Walk icon: only shown when walkMins is set (train / bus)
+  const showWalkIcon = walkMins != null
+
   return (
     <div className={!isLast ? 'border-b border-purple-500/10' : ''}>
 
@@ -118,14 +177,16 @@ export default function RouteOptionCard({ option, isLast }) {
       >
         {/* Line 1: mode badges + total time */}
         <div className="flex items-center justify-between gap-3 w-full">
-          {/* Left: chips connected with dots */}
           <div className="flex items-center gap-0 flex-wrap">
-            <ModeBadge line={line} type={type} />
-            <Dot />
-            <WalkIcon mins={walkMins} />
+            {badgeEl}
+            {showWalkIcon && (
+              <>
+                <Dot />
+                <WalkIcon mins={walkMins} />
+              </>
+            )}
           </div>
 
-          {/* Right: total journey time */}
           <TotalTime
             walkMins={walkMins}
             journeyMins={journeyMins}
@@ -147,26 +208,17 @@ export default function RouteOptionCard({ option, isLast }) {
       {/* ── Expanded timetable ────────────────────────────────── */}
       {expanded && (
         <div className="px-4 pb-4 pt-2 bg-white/[0.025]">
-          {/* Journey summary */}
-          <div className="flex items-center gap-1.5 mb-3">
-            <span className="text-xs leading-none">🚶</span>
-            {mapsUrl ? (
-              <a
-                href={mapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-purple-300/55 hover:text-purple-200/80 transition-colors underline underline-offset-2"
-              >
-                {walkMins != null ? `${walkMins} min walk to` : 'Walk to'} {station.name} → {destination}
-              </a>
-            ) : (
-              <span className="text-[11px] text-purple-300/50">
-                {walkMins != null ? `${walkMins} min walk to` : 'Walk to'} {station.name} → {destination}
-              </span>
-            )}
-          </div>
+          <JourneySummary
+            type={type}
+            station={station}
+            destination={destination}
+            walkMins={walkMins}
+            journeyMins={journeyMins}
+            mapsUrl={mapsUrl}
+            serviceNote={serviceNote}
+          />
 
-          {/* No-data note for tube options */}
+          {/* No-data note */}
           {departures.length === 0 && serviceNote && (
             <p className="text-[11px] text-purple-300/45 italic mt-1">{serviceNote}</p>
           )}

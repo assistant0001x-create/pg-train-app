@@ -4,13 +4,13 @@ import {
   PALMERS_GREEN,
   MOORGATE,
   TUBE_STATIONS,
+  TUBE_TRAIN_INTERCHANGE,
   HOME_ADDRESS,
   MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
   TUBE_STATION_BUS_ROUTES,
   OVERGROUND_STATIONS,
   OVERGROUND_STATION_BUS_ROUTES,
-  JOURNEY_MINS_TO_LST,
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
@@ -20,18 +20,11 @@ import { getDummyRouteOptions } from '../utils/dummyData'
 // Set VITE_DUMMY_MODE=false in .env to use the live API
 const DUMMY_MODE = import.meta.env.VITE_DUMMY_MODE !== 'false'
 
-// Approximate train journey times (minutes) from each GN station to Palmers Green
+// Approximate GN journey times (minutes) from each station to Palmers Green
 const JOURNEY_MINS_TO_PAL = {
   MOG: 30, OLD: 27, EXR: 24, HBY: 21, DRN: 18,
   FPK: 15, HRY: 12, HPY: 9,  ALX: 6,  BVP: 4,
   WGC: 4,  GAN: 6,  ENF: 9,  GNT: 12, CWN: 15, CHN: 18,
-}
-
-// Approximate Piccadilly tube journey times (minutes) to King's Cross St. Pancras
-const JOURNEY_MINS_TO_KGX = {
-  'Arnos Grove': 22,
-  'Bounds Green': 20,
-  'Southgate': 25,
 }
 
 function getServiceStatus(service) {
@@ -131,13 +124,22 @@ export function useTrainApp() {
         showStatus('info', 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
         return
       } else {
-        // LIVE HOME mode — self-contained: fetches, builds routeOptions, returns early
+        // ── LIVE HOME mode ────────────────────────────────────────────────────
+        // All options route the traveller TO Palmers Green / 73 Hazelwood Lane.
+        //
+        // Option categories:
+        //   1. Train only       — nearest GN station → GN train → Palmers Green
+        //   2. Tube + Train     — Piccadilly → Finsbury Park → GN → Palmers Green
+        //   3. Tube only        — Piccadilly → Arnos Grove / Bounds Green / Wood Green
+        //                          (eastbound arrivals shown at near-home station)
+        //   4. Overground       — Silver Street (for users coming from east London)
+        //   5. Bus              — when walking leg > 15 min in any option
+        // ─────────────────────────────────────────────────────────────────────
+
         let station = GREAT_NORTHERN_STATIONS.find((s) => s.code === 'FPK') || GREAT_NORTHERN_STATIONS[0]
         let location = null
         let trainWalkMins = null
         let trainMapsUrl = null
-        let tubeStationsWithWalk = []
-        let overgroundStationsWithWalk = []
 
         try {
           location = await getUserLocation()
@@ -147,35 +149,16 @@ export function useTrainApp() {
           const travelMode = trainWalkMins <= MAX_WALK_MINUTES ? 'walking' : 'transit'
           trainMapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
           setWalkingInfo({ trainWalkMins, station, mapsUrl: trainMapsUrl, travelMode, locationError: false })
-          tubeStationsWithWalk = TUBE_STATIONS.map((s) => ({
-            ...s,
-            walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
-            mapsUrl: buildMapsUrl(location, `${s.lat},${s.lon}`, 'walking'),
-          })).sort((a, b) => a.walkMins - b.walkMins)
-          overgroundStationsWithWalk = OVERGROUND_STATIONS.map((s) => ({
-            ...s,
-            walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
-            mapsUrl: buildMapsUrl(location, `${s.lat},${s.lon}`, 'walking'),
-          })).sort((a, b) => a.walkMins - b.walkMins)
         } catch (locErr) {
           trainMapsUrl = buildMapsUrl(null, `${station.lat},${station.lon}`, 'walking')
           setWalkingInfo({ trainWalkMins: null, station, mapsUrl: trainMapsUrl, travelMode: 'walking', locationError: true })
           console.warn('Could not get user location:', locErr)
         }
 
-        setHomeRoutingInfo({
-          location,
-          nearestTrain: station,
-          nearestTube: tubeStationsWithWalk[0] || null,
-          trainWalkMins,
-          tubeWalkMins: tubeStationsWithWalk[0]?.walkMins || null,
-          tubeStations: tubeStationsWithWalk,
-        })
+        setHomeRoutingInfo({ location, nearestTrain: station, trainWalkMins })
 
-        // Fetch live GN departures (one API call)
+        // ── 1. GN Train only ─────────────────────────────────────────────────
         const services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
-
-        // Build GN train route option
         const trainOption = {
           id: `train-${station.code}`,
           type: 'train',
@@ -189,45 +172,71 @@ export function useTrainApp() {
           departures: services,
         }
 
-        // Build Piccadilly tube options with live TfL arrivals
-        const nearbyTubeStations = tubeStationsWithWalk.filter((ts) => ts.walkMins != null && ts.walkMins <= 25)
+        // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
+        // Shows live GN departures from FPK → PAL.
+        // The user takes Piccadilly (any direction) to Finsbury Park, then boards here.
+        let tubePlusTrainOption = null
+        try {
+          const fpkServices = await fetchDepartures(TUBE_TRAIN_INTERCHANGE.crs, PALMERS_GREEN.code, { force })
+          tubePlusTrainOption = {
+            id: 'tube-train-fpk',
+            type: 'tube+train',
+            station: { name: TUBE_TRAIN_INTERCHANGE.name },
+            walkMins: null,
+            journeyMins: JOURNEY_MINS_TO_PAL[TUBE_TRAIN_INTERCHANGE.crs] || null,
+            destination: PALMERS_GREEN.name,
+            line: 'Great Northern',
+            tubeLine: 'Piccadilly',
+            operator: 'Great Northern / TfL',
+            mapsUrl: null,
+            departures: fpkServices,
+            serviceNote: 'Take Piccadilly line to Finsbury Park, then GN train',
+          }
+        } catch {
+          // Non-critical — omit if FPK fetch fails
+        }
+
+        // ── 3. Tube only — eastbound arrivals at near-home Piccadilly stations ─
+        // TUBE_STATIONS are the alight-here stations (Arnos Grove, Bounds Green, Wood Green).
+        // journeyMins = walk from that station to Palmers Green (the final leg home).
+        // walkMins = null because we don't know the user's boarding station on the Piccadilly line.
         const tubeOptions = await Promise.all(
-          nearbyTubeStations.map(async (ts) => {
+          TUBE_STATIONS.map(async (ts) => {
             let departures = []
             let serviceNote
-            if (ts.naptanId) {
-              try {
-                departures = await fetchTubeArrivals(ts.naptanId)
-              } catch {
-                serviceNote = 'Check TfL app for live times'
-              }
-            } else {
+            try {
+              departures = await fetchTubeArrivals(ts.naptanId)
+            } catch {
               serviceNote = 'Check TfL app for live times'
             }
+            const walkHome = Math.round(
+              walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
+            )
             return {
               id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
               type: 'tube',
               station: { name: ts.name, line: ts.line },
-              walkMins: ts.walkMins,
-              journeyMins: JOURNEY_MINS_TO_KGX[ts.name] || null,
-              destination: "King's Cross St. Pancras",
+              walkMins: null,          // boarding station unknown
+              journeyMins: walkHome,   // walk from this station to home
+              destination: PALMERS_GREEN.name,
               line: ts.line,
               operator: 'TfL',
-              mapsUrl: ts.mapsUrl || null,
+              mapsUrl: null,
               departures,
               serviceNote,
             }
           })
         )
 
-        // Build London Overground options (if within walking distance)
-        const nearbyOvergroundStations = overgroundStationsWithWalk.filter((s) => s.walkMins != null && s.walkMins <= 25)
+        // ── 4. Silver Street Overground (east London users) ──────────────────
+        // Shows northbound arrivals at Silver Street (Platform 2 = from Liverpool St).
+        // User alights here, then takes bus 102 toward Palmers Green.
         const overgroundOptions = await Promise.all(
-          nearbyOvergroundStations.map(async (os) => {
+          OVERGROUND_STATIONS.map(async (os) => {
             let departures = []
             let serviceNote
             try {
-              departures = await fetchOvergroundArrivals(os.naptanId)
+              departures = await fetchOvergroundArrivals(os.naptanId, { platformFilter: os.inboundPlatform })
             } catch {
               serviceNote = 'Check TfL app for live times'
             }
@@ -235,19 +244,22 @@ export function useTrainApp() {
               id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
               type: 'overground',
               station: { name: os.name, line: os.line },
-              walkMins: os.walkMins,
-              journeyMins: JOURNEY_MINS_TO_LST[os.name] || null,
-              destination: os.destination || 'Liverpool Street',
+              walkMins: null,
+              journeyMins: null,
+              destination: PALMERS_GREEN.name,
               line: os.line,
               operator: 'London Overground',
-              mapsUrl: os.mapsUrl || null,
+              mapsUrl: null,
               departures,
-              serviceNote,
+              serviceNote: serviceNote || 'Alight here then bus 102 to Palmers Green',
             }
           })
         )
 
-        // Fetch live bus options near user's GPS location
+        // ── 5. Bus options near user GPS ──────────────────────────────────────
+        // Shown when any leg involves >15 min walk, or as a direct route home.
+        // Destination shows the relevant near-home tube/overground station when the
+        // bus serves as a feeder for an option with a long walk.
         let busOptions = []
         if (location) {
           try {
@@ -255,19 +267,13 @@ export function useTrainApp() {
             busOptions = busData.map(({ route, stop, departures }) => {
               const stopWalkMins = walkingMinutes(location.lat, location.lon, stop.lat, stop.lon)
               const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
-              // Check if route serves a tube or overground station >15 min walk
-              const farStation =
-                tubeStationsWithWalk.find(
-                  (ts) =>
-                    ts.naptanId &&
-                    (ts.walkMins ?? 0) > 15 &&
-                    (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
+              // If this bus serves a near-home tube/overground station, label it accordingly
+              const linkedStation =
+                TUBE_STATIONS.find(
+                  (ts) => (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
                 ) ||
-                overgroundStationsWithWalk.find(
-                  (os) =>
-                    os.naptanId &&
-                    (os.walkMins ?? 0) > 15 &&
-                    (OVERGROUND_STATION_BUS_ROUTES[os.naptanId] || []).includes(route.toLowerCase())
+                OVERGROUND_STATIONS.find(
+                  (os) => (OVERGROUND_STATION_BUS_ROUTES[os.naptanId] || []).includes(route.toLowerCase())
                 )
               return {
                 id: `bus-${route.toLowerCase()}-${stop.id}`,
@@ -275,7 +281,7 @@ export function useTrainApp() {
                 station: { name: stop.name, line: route },
                 walkMins: stopWalkMins,
                 journeyMins: null,
-                destination: farStation ? farStation.name : 'Palmers Green',
+                destination: linkedStation ? linkedStation.name : PALMERS_GREEN.name,
                 line: route,
                 operator: 'TfL',
                 mapsUrl: stopMapsUrl,
@@ -287,15 +293,21 @@ export function useTrainApp() {
           }
         }
 
-        setRouteOptions([trainOption, ...tubeOptions, ...overgroundOptions, ...busOptions])
+        const allOptions = [
+          trainOption,
+          ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
+          ...tubeOptions,
+          ...overgroundOptions,
+          ...busOptions,
+        ]
+        setRouteOptions(allOptions)
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')
         return
       }
 
-      // ── OUT mode only below this point ───────────────────────────────────
-      // calling_at filter is handled by the API — no client-side filtering needed
+      // ── OUT mode only below this point ────────────────────────────────────
       let services = await fetchDepartures(fromStation, toCrs, { force })
 
       // Tracking notifications (out mode only)

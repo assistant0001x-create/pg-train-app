@@ -173,12 +173,12 @@ export async function fetchRailArrivals(naptanId, { platformFilter } = {}) {
     }))
 }
 
-// Fetch westbound Piccadilly line arrivals (toward central London / King's Cross)
+// Fetch eastbound Piccadilly arrivals (toward Cockfosters — alight near Palmers Green in HOME mode)
 export function fetchTubeArrivals(naptanId) {
-  return fetchRailArrivals(naptanId, { platformFilter: 'West' })
+  return fetchRailArrivals(naptanId, { platformFilter: 'East' })
 }
 
-// Fetch overground arrivals (all directions — no platform filter)
-export function fetchOvergroundArrivals(naptanId) {
-  return fetchRailArrivals(naptanId)
+// Fetch overground arrivals — optional platform filter (e.g. 'Platform 2' for Silver Street northbound)
+export function fetchOvergroundArrivals(naptanId, { platformFilter } = {}) {
+  return fetchRailArrivals(naptanId, { platformFilter })
 }
