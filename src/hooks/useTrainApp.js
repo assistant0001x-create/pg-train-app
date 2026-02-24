@@ -228,33 +228,38 @@ export function useTrainApp() {
           })
         )
 
-        // ── 4. Silver Street Overground (east London users) ──────────────────
-        // Shows northbound arrivals at Silver Street (Platform 2 = from Liverpool St).
-        // User alights here, then takes bus 102 toward Palmers Green.
-        const overgroundOptions = await Promise.all(
-          OVERGROUND_STATIONS.map(async (os) => {
-            let departures = []
-            let serviceNote
-            try {
-              departures = await fetchOvergroundArrivals(os.naptanId, { platformFilter: os.inboundPlatform })
-            } catch {
-              serviceNote = 'Check TfL app for live times'
-            }
-            return {
-              id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
-              type: 'overground',
-              station: { name: os.name, line: os.line },
-              walkMins: null,
-              journeyMins: null,
-              destination: PALMERS_GREEN.name,
-              line: os.line,
-              operator: 'London Overground',
-              mapsUrl: null,
-              departures,
-              serviceNote: serviceNote || 'Alight here then bus 102 to Palmers Green',
-            }
-          })
-        )
+        // ── 4. Silver Street Overground (east London users only) ─────────────
+        // Silver Street is east of Palmers Green. Only relevant when the user is
+        // in east London (Edmonton, Tottenham, Hackney, Liverpool Street area).
+        // Threshold: lon > -0.085 (east of the N13 / Palmers Green boundary).
+        // Platform 2 = northbound trains from Liverpool Street toward Cheshunt.
+        const isEastOfHome = location ? location.lon > -0.085 : false
+        const overgroundOptions = isEastOfHome
+          ? await Promise.all(
+              OVERGROUND_STATIONS.map(async (os) => {
+                let departures = []
+                let serviceNote
+                try {
+                  departures = await fetchOvergroundArrivals(os.naptanId, { platformFilter: os.inboundPlatform })
+                } catch {
+                  serviceNote = 'Check TfL app for live times'
+                }
+                return {
+                  id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
+                  type: 'overground',
+                  station: { name: os.name, line: os.line },
+                  walkMins: null,
+                  journeyMins: null,
+                  destination: PALMERS_GREEN.name,
+                  line: os.line,
+                  operator: 'London Overground',
+                  mapsUrl: null,
+                  departures,
+                  serviceNote: serviceNote || 'Alight here then bus 102 to Palmers Green',
+                }
+              })
+            )
+          : []
 
         // ── 5. Bus options near user GPS ──────────────────────────────────────
         // Shown when any leg involves >15 min walk, or as a direct route home.
@@ -293,12 +298,57 @@ export function useTrainApp() {
           }
         }
 
+        // ── 5b. Final-leg buses near each tube alight station ─────────────────
+        // When the walk from a tube station to home exceeds MAX_WALK_MINUTES,
+        // fetch live bus arrivals at that station so the user can bus the final leg.
+        // Run all three in parallel; deduplicate routes already shown from GPS buses.
+        const finalLegRaw = (await Promise.all(
+          TUBE_STATIONS.map(async (ts) => {
+            const walkHome = walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
+            if (walkHome <= MAX_WALK_MINUTES) return []
+            try {
+              const data = await fetchNearbyBusOptions(ts.lat, ts.lon)
+              return data.map(({ route, stop, departures }) => ({
+                fromTubeStation: ts.name,
+                route,
+                stop,
+                departures,
+                stopWalkMins: Math.round(walkingMinutes(ts.lat, ts.lon, stop.lat, stop.lon)),
+              }))
+            } catch {
+              return []
+            }
+          })
+        )).flat()
+
+        const shownRoutes = new Set(busOptions.map((b) => b.line.toLowerCase()))
+        const finalLegBusOptions = finalLegRaw
+          .filter(({ route }) => {
+            if (shownRoutes.has(route.toLowerCase())) return false
+            shownRoutes.add(route.toLowerCase())
+            return true
+          })
+          .map(({ fromTubeStation, route, stop, departures, stopWalkMins }) => ({
+            id: `bus-final-${route.toLowerCase()}-${fromTubeStation.replace(/\s+/g, '-').toLowerCase()}`,
+            type: 'bus',
+            station: { name: stop.name, line: route },
+            walkMins: stopWalkMins,
+            journeyMins: null,
+            destination: PALMERS_GREEN.name,
+            line: route,
+            operator: 'TfL',
+            mapsUrl: null,
+            departures,
+            serviceNote: `From ${fromTubeStation} → Palmers Green`,
+          }))
+
         const allOptions = [
           trainOption,
           ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
           ...tubeOptions,
           ...overgroundOptions,
           ...busOptions,
+          ...finalLegBusOptions,
         ]
         setRouteOptions(allOptions)
         setTrains(services.slice(0, 12))
