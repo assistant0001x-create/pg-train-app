@@ -22,9 +22,9 @@ export const PALMERS_GREEN = { code: 'PAL', name: 'Palmers Green', lat: 51.6176,
 export const MOORGATE = { code: 'MOG', name: 'Moorgate' }
 
 export const TUBE_STATIONS = [
-  { name: 'Arnos Grove', line: 'Piccadilly', lat: 51.6163, lon: -0.1334 },
-  { name: 'Southgate', line: 'Piccadilly', lat: 51.6325, lon: -0.1276 },
-  { name: 'Bounds Green', line: 'Piccadilly', lat: 51.6071, lon: -0.1242 },
+  { name: 'Arnos Grove', line: 'Piccadilly', lat: 51.6163, lon: -0.1334, naptanId: '940GZZLUASG' },
+  { name: 'Southgate', line: 'Piccadilly', lat: 51.6325, lon: -0.1276, naptanId: '940GZZLUSGT' },
+  { name: 'Bounds Green', line: 'Piccadilly', lat: 51.6071, lon: -0.1242, naptanId: '940GZZLUBDS' },
 ]
 
 export const HOME_ADDRESS = import.meta.env.VITE_HOME_ADDRESS || ''

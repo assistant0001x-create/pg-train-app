@@ -10,7 +10,7 @@ import {
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
-import { fetchDepartures } from '../utils/trainApi'
+import { fetchDepartures, fetchTubeArrivals } from '../utils/trainApi'
 import { getDummyRouteOptions } from '../utils/dummyData'
 
 // Set VITE_DUMMY_MODE=false in .env to use the live API
@@ -179,27 +179,41 @@ export function useTrainApp() {
           departures: services,
         }
 
-        // Build Piccadilly tube options (walk + estimated journey, no live departures)
-        const tubeOptions = tubeStationsWithWalk
-          .filter((ts) => ts.walkMins != null && ts.walkMins <= 25)
-          .map((ts) => ({
-            id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
-            type: 'tube',
-            station: { name: ts.name, line: ts.line },
-            walkMins: ts.walkMins,
-            journeyMins: JOURNEY_MINS_TO_KGX[ts.name] || null,
-            destination: "King's Cross St. Pancras",
-            line: ts.line,
-            operator: 'TfL',
-            mapsUrl: ts.mapsUrl || null,
-            departures: [],
-            serviceNote: 'Check TfL app for live times',
-          }))
+        // Build Piccadilly tube options with live TfL arrivals
+        const nearbyTubeStations = tubeStationsWithWalk.filter((ts) => ts.walkMins != null && ts.walkMins <= 25)
+        const tubeOptions = await Promise.all(
+          nearbyTubeStations.map(async (ts) => {
+            let departures = []
+            let serviceNote
+            if (ts.naptanId) {
+              try {
+                departures = await fetchTubeArrivals(ts.naptanId)
+              } catch {
+                serviceNote = 'Check TfL app for live times'
+              }
+            } else {
+              serviceNote = 'Check TfL app for live times'
+            }
+            return {
+              id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
+              type: 'tube',
+              station: { name: ts.name, line: ts.line },
+              walkMins: ts.walkMins,
+              journeyMins: JOURNEY_MINS_TO_KGX[ts.name] || null,
+              destination: "King's Cross St. Pancras",
+              line: ts.line,
+              operator: 'TfL',
+              mapsUrl: ts.mapsUrl || null,
+              departures,
+              serviceNote,
+            }
+          })
+        )
 
         setRouteOptions([trainOption, ...tubeOptions])
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
-        showStatus('success', 'Connected. Showing live Great Northern departures.')
+        showStatus('success', 'Connected. Showing live departures.')
         return
       }
 

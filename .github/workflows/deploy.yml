@@ -36,6 +36,7 @@ jobs:
           VITE_DUMMY_MODE: false
           VITE_HOME_ADDRESS: ${{ secrets.VITE_HOME_ADDRESS }}
           VITE_RDG_API_KEY: ${{ secrets.VITE_RDG_API_KEY }}
+          VITE_TFL_API_KEY: ${{ secrets.VITE_TFL_API_KEY }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

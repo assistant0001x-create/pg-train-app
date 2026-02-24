@@ -3,6 +3,10 @@
 const API_KEY = import.meta.env.VITE_RDG_API_KEY
 const BASE = 'https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120/GetDepartureBoard'
 
+// TfL Unified API — StopPoint Arrivals
+const TFL_KEY = import.meta.env.VITE_TFL_API_KEY
+const TFL_BASE = 'https://api.tfl.gov.uk'
+
 function transformService(svc) {
   // RDG already returns std/etd/isCancelled/platform/operator/serviceID directly
   return {
@@ -70,4 +74,36 @@ export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
   const services = (data.trainServices || []).map(transformService)
   writeCache(fromCrs, toCrs, services)
   return services
+}
+
+function secondsToTimeString(secs) {
+  const d = new Date(Date.now() + secs * 1000)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// Fetch westbound Piccadilly line arrivals (toward central London / King's Cross)
+export async function fetchTubeArrivals(naptanId) {
+  if (!TFL_KEY) throw new Error('TfL API key not configured.')
+
+  const res = await fetch(`${TFL_BASE}/StopPoint/${naptanId}/Arrivals?app_key=${TFL_KEY}`)
+
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) throw new Error('TfL API key invalid or unauthorised.')
+    throw new Error(`TfL API error: ${res.status}`)
+  }
+
+  const data = await res.json()
+  return data
+    .filter((a) => a.platformName && a.platformName.includes('West'))
+    .sort((a, b) => a.timeToStation - b.timeToStation)
+    .slice(0, 6)
+    .map((a) => ({
+      std: secondsToTimeString(a.timeToStation),
+      etd: 'On time',
+      isCancelled: false,
+      platform: a.platformName || '—',
+      operator: 'TfL',
+      serviceID: a.vehicleId || String(a.timeToStation),
+      serviceId: a.vehicleId || String(a.timeToStation),
+    }))
 }
