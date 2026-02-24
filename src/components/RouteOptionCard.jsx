@@ -139,7 +139,7 @@ function buildStages(option) {
 
 export default function RouteOptionCard({ option, isLast }) {
   const [expanded, setExpanded] = useState(false)
-  const { station, walkMins, journeyMins, departures, serviceNote } = option
+  const { station, walkMins, journeyMins, departures, serviceNote, reliableDuration } = option
 
   const nextThree = departures
     .filter((d) => !d.isCancelled)
@@ -154,8 +154,8 @@ export default function RouteOptionCard({ option, isLast }) {
     ? (nextThree.length > 0 ? `in ${nextThree.join(', ')} min` : 'No services')
     : (serviceNote || 'No live data')
 
-  const catchMin = journeyMins != null ? firstCatchable(departures, walkMins) : null
-  const total = catchMin != null && journeyMins != null ? catchMin + journeyMins : null
+  const catchMin = reliableDuration && journeyMins != null ? firstCatchable(departures, walkMins) : null
+  const total = reliableDuration && catchMin != null && journeyMins != null ? catchMin + journeyMins : null
   const stages = buildStages(option)
 
   return (
@@ -168,7 +168,7 @@ export default function RouteOptionCard({ option, isLast }) {
           <div className="flex-1">
             <StepStrip option={option} />
             <div className="mt-1.5 text-xs text-slate-700 leading-tight font-medium">
-              Duration: {total != null ? `${total} min` : 'calculating…'}
+              Duration: {total != null ? `${total} min` : '—'}
             </div>
             <div className="mt-1 text-[11px] text-slate-500 leading-tight">
               {depsStr} from {station.name}
