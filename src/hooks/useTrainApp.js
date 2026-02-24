@@ -20,6 +20,9 @@ import { getDummyRouteOptions } from '../utils/dummyData'
 // Set VITE_DUMMY_MODE=false in .env to use the live API
 const DUMMY_MODE = import.meta.env.VITE_DUMMY_MODE !== 'false'
 
+// Default home destination shown across HOME mode routes
+const HOME_DESTINATION = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
+
 // Approximate GN journey times (minutes) from each station to Palmers Green
 const JOURNEY_MINS_TO_PAL = {
   MOG: 30, OLD: 27, EXR: 24, HBY: 21, DRN: 18,
@@ -165,7 +168,7 @@ export function useTrainApp() {
           station: { code: station.code, name: station.name },
           walkMins: trainWalkMins,
           journeyMins: JOURNEY_MINS_TO_PAL[station.code] || null,
-          destination: PALMERS_GREEN.name,
+          destination: HOME_DESTINATION,
           line: 'Great Northern',
           operator: 'Great Northern',
           mapsUrl: trainMapsUrl,
@@ -184,7 +187,7 @@ export function useTrainApp() {
             station: { name: TUBE_TRAIN_INTERCHANGE.name },
             walkMins: null,
             journeyMins: JOURNEY_MINS_TO_PAL[TUBE_TRAIN_INTERCHANGE.crs] || null,
-            destination: PALMERS_GREEN.name,
+            destination: HOME_DESTINATION,
             line: 'Great Northern',
             tubeLine: 'Piccadilly',
             operator: 'Great Northern / TfL',
@@ -218,7 +221,7 @@ export function useTrainApp() {
               station: { name: ts.name, line: ts.line },
               walkMins: null,          // boarding station unknown
               journeyMins: walkHome,   // walk from this station to home
-              destination: PALMERS_GREEN.name,
+              destination: HOME_DESTINATION,
               line: ts.line,
               operator: 'TfL',
               mapsUrl: null,
@@ -250,7 +253,7 @@ export function useTrainApp() {
                   station: { name: os.name, line: os.line },
                   walkMins: null,
                   journeyMins: null,
-                  destination: PALMERS_GREEN.name,
+                  destination: HOME_DESTINATION,
                   line: os.line,
                   operator: 'London Overground',
                   mapsUrl: null,
@@ -286,7 +289,7 @@ export function useTrainApp() {
                 station: { name: stop.name, line: route },
                 walkMins: stopWalkMins,
                 journeyMins: null,
-                destination: linkedStation ? linkedStation.name : PALMERS_GREEN.name,
+                destination: HOME_DESTINATION,
                 line: route,
                 operator: 'TfL',
                 mapsUrl: stopMapsUrl,
@@ -334,7 +337,7 @@ export function useTrainApp() {
             station: { name: stop.name, line: route },
             walkMins: stopWalkMins,
             journeyMins: null,
-            destination: PALMERS_GREEN.name,
+            destination: HOME_DESTINATION,
             line: route,
             operator: 'TfL',
             mapsUrl: null,

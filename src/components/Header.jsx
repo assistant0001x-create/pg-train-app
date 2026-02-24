@@ -1,3 +1,4 @@
+import { HOME_ADDRESS } from '../constants/stations'
 export default function Header({
   currentMode,
   setMode,
@@ -9,12 +10,14 @@ export default function Header({
   requestNotifications,
   clearCacheAndReload,
 }) {
+  const homeLabel = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
+
   const routeInfo =
     currentMode === 'out'
       ? 'Palmers Green → Moorgate'
       : walkingInfo
-      ? `${walkingInfo.station.name} → Palmers Green`
-      : 'Your location → Home'
+      ? `${walkingInfo.station.name} → ${homeLabel}`
+      : `Your location → ${homeLabel}`
 
   function WalkingDisplay() {
     if (!walkingInfo || currentMode === 'out') return null
@@ -85,19 +88,22 @@ export default function Header({
 
         {/* Mode toggle */}
         <div className="flex gap-2 mb-5 glass-card rounded-2xl p-1.5">
-          {['out', 'home'].map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setMode(mode)}
-              className={`flex-1 py-3 px-5 rounded-xl text-sm font-semibold transition-all ${
-                currentMode === mode
-                  ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/40 hover:shadow-pink-500/60'
-                  : 'bg-transparent text-purple-200 hover:bg-white/5'
-              }`}
-            >
-              {mode.toUpperCase()}
-            </button>
-          ))}
+          {['out', 'home'].map((mode) => {
+            const label = mode === 'out' ? 'To City' : 'Go Home'
+            return (
+              <button
+                key={mode}
+                onClick={() => setMode(mode)}
+                className={`flex-1 py-3 px-5 rounded-xl text-sm font-semibold transition-all ${
+                  currentMode === mode
+                    ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/40 hover:shadow-pink-500/60'
+                    : 'bg-transparent text-purple-200 hover:bg-white/5'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
 
         {/* Route info */}
