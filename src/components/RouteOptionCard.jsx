@@ -7,7 +7,9 @@ function minsFromNow(timeStr) {
   const now = new Date()
   const dep = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)
   if (dep < now) dep.setDate(dep.getDate() + 1)
-  return Math.round((dep - now) / 60000)
+  const mins = Math.round((dep - now) / 60000)
+  if (mins < 0 || mins > 300) return null
+  return mins
 }
 
 function effectiveTime(dep) {
@@ -50,25 +52,16 @@ const STEP_ICON = {
   bus: '🚌',
 }
 
-const STEP_LABEL = {
-  walk: 'Walk',
-  tube: 'Tube',
-  train: 'Train',
-  overground: 'Overground',
-  bus: 'Bus',
-}
-
 function StepStrip({ option }) {
   const steps = getStepTokens(option)
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap">
       {steps.map((step, i) => (
         <div key={`${step}-${i}`} className="inline-flex items-center">
-          <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-            <span>{STEP_ICON[step]}</span>
-            <span>{STEP_LABEL[step]}</span>
+          <span className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 w-9 h-9 text-xl" aria-label={step}>
+            {STEP_ICON[step]}
           </span>
-          {i < steps.length - 1 && <span className="mx-1 text-slate-300 text-[10px]">•</span>}
+          {i < steps.length - 1 && <span className="mx-1 text-slate-300 text-sm">•</span>}
         </div>
       ))}
     </div>
@@ -132,7 +125,10 @@ export default function RouteOptionCard({ option, isLast }) {
         <div className="flex items-start justify-between gap-3 w-full">
           <div className="flex-1">
             <StepStrip option={option} />
-            <div className="mt-1.5 text-[11px] text-slate-500 leading-tight">
+            <div className="mt-1.5 text-xs text-slate-700 leading-tight font-medium">
+              {station.name} → {option.destination}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-500 leading-tight">
               {depsStr} from {station.name}
             </div>
           </div>
