@@ -6,27 +6,21 @@ export default function Header({
   isLoading,
   fetchTrains,
   lastUpdate,
-  walkingInfo,
   notificationsGranted,
   requestNotifications,
   clearCacheAndReload,
 }) {
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
-
-  const routeInfo =
-    currentMode === 'out'
-      ? 'Palmers Green → Moorgate'
-      : walkingInfo
-      ? `${walkingInfo.station.name} → ${homeLabel}`
-      : `Your location → ${homeLabel}`
+  const routeInfo = currentMode === 'out' ? 'Palmers Green → Moorgate' : `Current location → ${homeLabel}`
+  const subtitle = currentMode === 'out' ? 'Live Great Northern departures' : 'Suggested multi-step routes home'
 
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-6 mb-4 border border-slate-200 shadow-sm">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
           <p className="text-xs font-semibold text-emerald-600 tracking-wide uppercase">PG Routes</p>
-          <h1 className="text-2xl font-bold text-slate-900">Citymapper-style view</h1>
-          <p className="text-sm text-slate-500">Destination fixed to {homeLabel}</p>
+          <h1 className="text-2xl font-bold text-slate-900">Palmers Green</h1>
+          <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
         <button
           onClick={() => fetchTrains({ force: true })}
@@ -41,7 +35,6 @@ export default function Header({
 
       <div className="grid grid-cols-2 gap-2 bg-slate-100 rounded-xl p-1 mb-4">
         {['out', 'home'].map((mode) => {
-          const label = mode === 'out' ? 'To City' : 'Go Home'
           const active = currentMode === mode
           return (
             <button
@@ -51,7 +44,7 @@ export default function Header({
                 active ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
               }`}
             >
-              {label}
+              {mode.toUpperCase()}
             </button>
           )
         })}
