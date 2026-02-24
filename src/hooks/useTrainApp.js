@@ -56,6 +56,31 @@ function getTrackedDepartureTime(service) {
   return parseDepartureTime(service.std || service.sta)
 }
 
+function getOptionSortMinutes(option) {
+  const baseJourney = option.journeyMins ?? 0
+  const walk = option.walkMins ?? 0
+  if (!option.departures || option.departures.length === 0) return Number.POSITIVE_INFINITY
+
+  const nextMins = option.departures
+    .filter((d) => !d.isCancelled)
+    .map((d) => {
+      const t = d.etd && d.etd !== 'On time' ? d.etd : d.std
+      const dep = parseDepartureTime(t)
+      if (!dep) return null
+      const mins = Math.round((dep.getTime() - Date.now()) / 60000)
+      if (mins < 0 || mins > 300) return null
+      return mins
+    })
+    .filter((m) => m !== null)
+
+  if (nextMins.length === 0) return Number.POSITIVE_INFINITY
+
+  const catchable = nextMins.find((m) => m >= walk)
+  if (catchable == null) return Number.POSITIVE_INFINITY
+
+  return catchable + baseJourney
+}
+
 function sendNotification(title, body) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
   new Notification(title, { body, icon: '🚂' })
@@ -168,7 +193,7 @@ export function useTrainApp() {
           station: { code: station.code, name: station.name },
           walkMins: trainWalkMins,
           journeyMins: JOURNEY_MINS_TO_PAL[station.code] || null,
-          destination: HOME_DESTINATION,
+          destination: PALMERS_GREEN.name,
           line: 'Great Northern',
           operator: 'Great Northern',
           mapsUrl: trainMapsUrl,
@@ -187,7 +212,7 @@ export function useTrainApp() {
             station: { name: TUBE_TRAIN_INTERCHANGE.name },
             walkMins: null,
             journeyMins: JOURNEY_MINS_TO_PAL[TUBE_TRAIN_INTERCHANGE.crs] || null,
-            destination: HOME_DESTINATION,
+            destination: PALMERS_GREEN.name,
             line: 'Great Northern',
             tubeLine: 'Piccadilly',
             operator: 'Great Northern / TfL',
@@ -345,15 +370,15 @@ export function useTrainApp() {
             serviceNote: `From ${fromTubeStation} → Palmers Green`,
           }))
 
-        const allOptions = [
-          trainOption,
+        const otherOptions = [
           ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
           ...tubeOptions,
           ...overgroundOptions,
           ...busOptions,
           ...finalLegBusOptions,
-        ]
-        setRouteOptions(allOptions)
+        ].sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
+
+        setRouteOptions([trainOption, ...otherOptions])
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')
