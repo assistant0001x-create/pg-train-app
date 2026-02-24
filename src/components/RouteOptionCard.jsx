@@ -38,6 +38,8 @@ const MODE_ICON = {
 
 function getStepTokens(option) {
   switch (option.type) {
+    case 'walk':
+      return ['walk']
     case 'tube+train':
       return ['walk', 'tube', 'train', 'walk']
     case 'tube':
@@ -108,6 +110,10 @@ function durationLabel(mins) {
 function buildStages(option) {
   const destStation = option.destination || 'Palmers Green'
   switch (option.type) {
+    case 'walk':
+      return [
+        { mode: 'walk', from: 'Current location', to: destStation, mins: option.journeyMins },
+      ]
     case 'tube+train':
       return [
         { mode: 'tube', from: 'Current location', to: option.station.name, mins: null },
@@ -155,7 +161,9 @@ export default function RouteOptionCard({ option, isLast }) {
     : (serviceNote || 'No live data')
 
   const catchMin = reliableDuration && journeyMins != null ? firstCatchable(departures, walkMins) : null
-  const total = reliableDuration && catchMin != null && journeyMins != null ? catchMin + journeyMins : null
+  const total = option.type === 'walk'
+    ? journeyMins
+    : (reliableDuration && catchMin != null && journeyMins != null ? catchMin + journeyMins : null)
   const stages = buildStages(option)
 
   return (

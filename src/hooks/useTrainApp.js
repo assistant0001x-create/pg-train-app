@@ -184,6 +184,34 @@ export function useTrainApp() {
 
         setHomeRoutingInfo({ location, nearestTrain: station, trainWalkMins })
 
+        // Citymapper-like sanity rule: if you're already very close to home,
+        // prefer walk-only and suppress long public transport options.
+        if (location) {
+          const walkToHome = Math.round(walkingMinutes(location.lat, location.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon))
+          if (walkToHome <= 12) {
+            setRouteOptions([
+              {
+                id: 'walk-home',
+                type: 'walk',
+                station: { name: 'Current location' },
+                walkMins: 0,
+                journeyMins: walkToHome,
+                destination: HOME_DESTINATION,
+                line: 'Walk',
+                operator: 'Walk',
+                mapsUrl: buildMapsUrl(location, HOME_DESTINATION, 'walking'),
+                departures: [],
+                serviceNote: walkToHome <= 2 ? 'Destination is very near — walk.' : 'Best option right now: walk home.',
+                reliableDuration: true,
+              },
+            ])
+            setTrains([])
+            setLastUpdate(new Date())
+            showStatus('success', 'You are already near home — showing walk route.')
+            return
+          }
+        }
+
         // ── 1. GN Train only ─────────────────────────────────────────────────
         const services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
         const trainOption = {
