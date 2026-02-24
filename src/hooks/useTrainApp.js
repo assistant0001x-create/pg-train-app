@@ -8,10 +8,13 @@ import {
   MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
   TUBE_STATION_BUS_ROUTES,
+  OVERGROUND_STATIONS,
+  OVERGROUND_STATION_BUS_ROUTES,
+  JOURNEY_MINS_TO_LST,
 } from '../constants/stations'
 import { getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
-import { fetchDepartures, fetchTubeArrivals, fetchNearbyBusOptions } from '../utils/trainApi'
+import { fetchDepartures, fetchTubeArrivals, fetchOvergroundArrivals, fetchNearbyBusOptions } from '../utils/trainApi'
 import { getDummyRouteOptions } from '../utils/dummyData'
 
 // Set VITE_DUMMY_MODE=false in .env to use the live API
@@ -134,6 +137,7 @@ export function useTrainApp() {
         let trainWalkMins = null
         let trainMapsUrl = null
         let tubeStationsWithWalk = []
+        let overgroundStationsWithWalk = []
 
         try {
           location = await getUserLocation()
@@ -144,6 +148,11 @@ export function useTrainApp() {
           trainMapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
           setWalkingInfo({ trainWalkMins, station, mapsUrl: trainMapsUrl, travelMode, locationError: false })
           tubeStationsWithWalk = TUBE_STATIONS.map((s) => ({
+            ...s,
+            walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
+            mapsUrl: buildMapsUrl(location, `${s.lat},${s.lon}`, 'walking'),
+          })).sort((a, b) => a.walkMins - b.walkMins)
+          overgroundStationsWithWalk = OVERGROUND_STATIONS.map((s) => ({
             ...s,
             walkMins: walkingMinutes(location.lat, location.lon, s.lat, s.lon),
             mapsUrl: buildMapsUrl(location, `${s.lat},${s.lon}`, 'walking'),
@@ -211,6 +220,33 @@ export function useTrainApp() {
           })
         )
 
+        // Build London Overground options (if within walking distance)
+        const nearbyOvergroundStations = overgroundStationsWithWalk.filter((s) => s.walkMins != null && s.walkMins <= 25)
+        const overgroundOptions = await Promise.all(
+          nearbyOvergroundStations.map(async (os) => {
+            let departures = []
+            let serviceNote
+            try {
+              departures = await fetchOvergroundArrivals(os.naptanId)
+            } catch {
+              serviceNote = 'Check TfL app for live times'
+            }
+            return {
+              id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
+              type: 'overground',
+              station: { name: os.name, line: os.line },
+              walkMins: os.walkMins,
+              journeyMins: JOURNEY_MINS_TO_LST[os.name] || null,
+              destination: os.destination || 'Liverpool Street',
+              line: os.line,
+              operator: 'London Overground',
+              mapsUrl: os.mapsUrl || null,
+              departures,
+              serviceNote,
+            }
+          })
+        )
+
         // Fetch live bus options near user's GPS location
         let busOptions = []
         if (location) {
@@ -219,20 +255,27 @@ export function useTrainApp() {
             busOptions = busData.map(({ route, stop, departures }) => {
               const stopWalkMins = walkingMinutes(location.lat, location.lon, stop.lat, stop.lon)
               const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
-              // If this route serves a tube station >15 min walk, label it as "bus to station"
-              const farTubeStation = tubeStationsWithWalk.find(
-                (ts) =>
-                  ts.naptanId &&
-                  (ts.walkMins ?? 0) > 15 &&
-                  (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
-              )
+              // Check if route serves a tube or overground station >15 min walk
+              const farStation =
+                tubeStationsWithWalk.find(
+                  (ts) =>
+                    ts.naptanId &&
+                    (ts.walkMins ?? 0) > 15 &&
+                    (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).includes(route.toLowerCase())
+                ) ||
+                overgroundStationsWithWalk.find(
+                  (os) =>
+                    os.naptanId &&
+                    (os.walkMins ?? 0) > 15 &&
+                    (OVERGROUND_STATION_BUS_ROUTES[os.naptanId] || []).includes(route.toLowerCase())
+                )
               return {
                 id: `bus-${route.toLowerCase()}-${stop.id}`,
                 type: 'bus',
                 station: { name: stop.name, line: route },
                 walkMins: stopWalkMins,
                 journeyMins: null,
-                destination: farTubeStation ? farTubeStation.name : 'Palmers Green',
+                destination: farStation ? farStation.name : 'Palmers Green',
                 line: route,
                 operator: 'TfL',
                 mapsUrl: stopMapsUrl,
@@ -244,7 +287,7 @@ export function useTrainApp() {
           }
         }
 
-        setRouteOptions([trainOption, ...tubeOptions, ...busOptions])
+        setRouteOptions([trainOption, ...tubeOptions, ...overgroundOptions, ...busOptions])
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')

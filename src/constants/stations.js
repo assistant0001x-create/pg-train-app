@@ -42,3 +42,18 @@ export const TUBE_STATION_BUS_ROUTES = {
   '940GZZLUBDS': ['184', '299', '102'],        // Bounds Green
   '940GZZLUSGT': ['121', 'w6', '298', '299'], // Southgate
 }
+
+// London Overground stations reachable from the N13 area
+export const OVERGROUND_STATIONS = [
+  { name: 'Silver Street', line: 'London Overground', lat: 51.614688, lon: -0.06724, naptanId: '910GSIVRST', destination: 'Liverpool Street' },
+]
+
+// Approximate overground journey times (minutes) to Liverpool Street
+export const JOURNEY_MINS_TO_LST = {
+  'Silver Street': 32,
+}
+
+// Bus routes that stop near each overground station
+export const OVERGROUND_STATION_BUS_ROUTES = {
+  '910GSIVRST': ['102', '34'], // Silver Street
+}

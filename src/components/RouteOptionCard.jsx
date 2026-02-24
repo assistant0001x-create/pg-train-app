@@ -34,11 +34,13 @@ function firstCatchable(departures, walkMins) {
 const BADGE_STYLES = {
   'Great Northern': 'bg-[#00843D] text-white',
   Piccadilly: 'bg-[#003688] text-white',
+  'London Overground': 'bg-[#EE7C0E] text-white',
 }
 
 const BADGE_LABELS = {
   'Great Northern': 'GN',
   Piccadilly: 'Picc',
+  'London Overground': 'OVG',
 }
 
 function ModeBadge({ line, type }) {
@@ -46,7 +48,7 @@ function ModeBadge({ line, type }) {
     ? 'bg-[#E1251B] text-white'
     : (BADGE_STYLES[line] || 'bg-purple-700 text-white')
   const label = type === 'bus' ? line : (BADGE_LABELS[line] || line.slice(0, 4))
-  const icon = type === 'train' ? '🚆' : type === 'bus' ? '🚌' : '🚇'
+  const icon = type === 'train' ? '🚆' : type === 'bus' ? '🚌' : type === 'overground' ? '🚂' : '🚇'
 
   return (
     <span

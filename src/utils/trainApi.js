@@ -143,8 +143,8 @@ export async function fetchNearbyBusOptions(lat, lon) {
   })
 }
 
-// Fetch westbound Piccadilly line arrivals (toward central London / King's Cross)
-export async function fetchTubeArrivals(naptanId) {
+// Generic TfL rail arrivals — optionally filter by platform name substring
+export async function fetchRailArrivals(naptanId, { platformFilter } = {}) {
   if (!TFL_KEY) throw new Error('TfL API key not configured.')
 
   const res = await fetch(`${TFL_BASE}/StopPoint/${naptanId}/Arrivals?app_key=${TFL_KEY}`)
@@ -155,8 +155,11 @@ export async function fetchTubeArrivals(naptanId) {
   }
 
   const data = await res.json()
-  return data
-    .filter((a) => a.platformName && a.platformName.includes('West'))
+  const filtered = platformFilter
+    ? data.filter((a) => a.platformName && a.platformName.includes(platformFilter))
+    : data
+
+  return filtered
     .sort((a, b) => a.timeToStation - b.timeToStation)
     .slice(0, 6)
     .map((a) => ({
@@ -164,8 +167,18 @@ export async function fetchTubeArrivals(naptanId) {
       etd: 'On time',
       isCancelled: false,
       platform: a.platformName || '—',
-      operator: 'TfL',
+      operator: a.operatorName || 'TfL',
       serviceID: a.vehicleId || String(a.timeToStation),
       serviceId: a.vehicleId || String(a.timeToStation),
     }))
+}
+
+// Fetch westbound Piccadilly line arrivals (toward central London / King's Cross)
+export function fetchTubeArrivals(naptanId) {
+  return fetchRailArrivals(naptanId, { platformFilter: 'West' })
+}
+
+// Fetch overground arrivals (all directions — no platform filter)
+export function fetchOvergroundArrivals(naptanId) {
+  return fetchRailArrivals(naptanId)
 }
