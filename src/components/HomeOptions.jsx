@@ -14,10 +14,10 @@ export default function HomeOptions({ routeOptions, isLoading }) {
   return (
     <div className="mb-5">
       {/* Plain section header — outside the panel, like CityMapper */}
-      <p className="text-sm font-semibold text-purple-200/50 mb-2 px-1">Suggested</p>
+      <p className="text-sm font-semibold text-slate-500 mb-2 px-1">Suggested routes</p>
 
       {/* All routes in one glass panel */}
-      <div className="glass-card rounded-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
         {routeOptions.map((option, i) => (
           <RouteOptionCard
             key={option.id}

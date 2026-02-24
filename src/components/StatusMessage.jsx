@@ -1,14 +1,14 @@
 const colorMap = {
-  success: 'bg-pink-950/40 border-pink-700/50 text-pink-100',
-  error: 'bg-red-950/40 border-red-700/50 text-red-100',
-  warning: 'bg-amber-950/40 border-amber-700/50 text-amber-100',
-  info: 'bg-purple-950/40 border-purple-700/50 text-purple-100',
+  success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+  error: 'bg-red-50 border-red-200 text-red-800',
+  warning: 'bg-amber-50 border-amber-200 text-amber-800',
+  info: 'bg-sky-50 border-sky-200 text-sky-800',
 }
 
 export default function StatusMessage({ status }) {
   if (!status) return null
   return (
-    <div className={`${colorMap[status.type]} border rounded-2xl px-4 py-3 mb-5 text-sm font-medium glass-effect backdrop-blur-sm`}>
+    <div className={`${colorMap[status.type]} border rounded-xl px-4 py-3 mb-4 text-sm font-medium`}>
       {status.message}
     </div>
   )
