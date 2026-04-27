@@ -92,7 +92,7 @@ async function getUserLocation() {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       reject,
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
   })
 }
@@ -524,9 +524,11 @@ export function useTrainApp() {
     }
   }, [setTrackedServiceID, showStatus])
 
-  // Fetch whenever mode changes (and on mount)
+  // Fetch whenever mode changes (and on mount); auto-refresh every 60s
   useEffect(() => {
     fetchTrains()
+    const interval = setInterval(() => fetchTrains(), 60 * 1000)
+    return () => clearInterval(interval)
   }, [currentMode, fetchTrains])
 
   const setMode = useCallback((mode) => setCurrentMode(mode), [setCurrentMode])
