@@ -48,7 +48,7 @@ export default function HireCarSection({ userLocation }) {
   return (
     <div className="mb-5">
       <p className="text-[10px] font-semibold text-white/40 mb-2 px-1 uppercase tracking-wide">
-        Hire a car
+        Cab
       </p>
       <div className="space-y-3">
         {PROVIDERS.map((p) => {

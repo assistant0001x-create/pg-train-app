@@ -3,6 +3,7 @@ import {
   GREAT_NORTHERN_STATIONS,
   PALMERS_GREEN,
   MOORGATE,
+  HOME_COORDS,
   TUBE_STATIONS,
   TUBE_TRAIN_INTERCHANGE,
   HOME_ADDRESS,
@@ -187,7 +188,14 @@ export function useTrainApp() {
         // Citymapper-like sanity rule: if you're already very close to home,
         // prefer walk-only and suppress long public transport options.
         if (location) {
-          const walkToHome = Math.round(walkingMinutes(location.lat, location.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon))
+          const walkToHome = Math.round(walkingMinutes(location.lat, location.lon, HOME_COORDS.lat, HOME_COORDS.lon))
+          if (walkToHome <= 2) {
+            setRouteOptions([])
+            setTrains([])
+            setLastUpdate(new Date())
+            showStatus('success', 'You are home.')
+            return
+          }
           if (walkToHome <= 12) {
             setRouteOptions([
               {
@@ -201,7 +209,7 @@ export function useTrainApp() {
                 operator: 'Walk',
                 mapsUrl: buildMapsUrl(location, HOME_DESTINATION, 'walking'),
                 departures: [],
-                serviceNote: walkToHome <= 2 ? 'Destination is very near — walk.' : 'Best option right now: walk home.',
+                serviceNote: 'Best option right now: walk home.',
                 reliableDuration: true,
               },
             ])
