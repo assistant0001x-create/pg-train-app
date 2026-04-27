@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { HOME_COORDS } from '../constants/stations'
+import { HOME_COORDS, HOME_ADDRESS } from '../constants/stations'
 
 function buildDirectionsUrl(fromCoords, toCoords) {
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
   const isHome = toCoords.lat === HOME_COORDS.lat && toCoords.lon === HOME_COORDS.lon
-  const destination = isHome
-    ? '73 Hazelwood Lane London N13 5HE'
-    : `${toCoords.lat},${toCoords.lon}`
-  const params = new URLSearchParams({ api: '1', travelmode: 'walking', destination })
+  if (isIOS) {
+    const from = fromCoords ? `${fromCoords.lat},${fromCoords.lon}` : 'Current+Location'
+    const dest = isHome && HOME_ADDRESS ? encodeURIComponent(HOME_ADDRESS) : `${toCoords.lat},${toCoords.lon}`
+    return `https://maps.apple.com/?saddr=${from}&daddr=${dest}&dirflg=w`
+  }
+  const dest = isHome && HOME_ADDRESS ? HOME_ADDRESS : `${toCoords.lat},${toCoords.lon}`
+  const params = new URLSearchParams({ api: '1', travelmode: 'walking', destination: dest })
   if (fromCoords) params.set('origin', `${fromCoords.lat},${fromCoords.lon}`)
   return `https://www.google.com/maps/dir/?${params.toString()}`
 }

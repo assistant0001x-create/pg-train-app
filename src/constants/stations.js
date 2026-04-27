@@ -20,7 +20,7 @@ export const GREAT_NORTHERN_STATIONS = [
 
 export const PALMERS_GREEN = { code: 'PAL', name: 'Palmers Green', lat: 51.6176, lon: -0.1116 }
 export const MOORGATE = { code: 'MOG', name: 'Moorgate' }
-export const HOME_COORDS = { lat: 51.6240, lon: -0.1086 }
+export const HOME_COORDS = { lat: 51.6183, lon: -0.1025 }
 
 // Piccadilly stations nearest home — used as alight-here targets in HOME mode
 // Shows eastbound arrivals (trains coming from central London toward Cockfosters)
