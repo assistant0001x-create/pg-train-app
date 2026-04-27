@@ -11,7 +11,7 @@ export default function App() {
   const [activeModal, setActiveModal] = useState(null)
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
+    <div className="min-h-screen bg-[#0f172a]">
       <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <Header
           currentMode={app.currentMode}
@@ -28,7 +28,11 @@ export default function App() {
         <StatusMessage status={app.status} />
 
         {app.currentMode === 'home' && (
-          <HomeOptions routeOptions={app.routeOptions} isLoading={app.isLoading} />
+          <HomeOptions
+            routeOptions={app.routeOptions}
+            isLoading={app.isLoading}
+            userLocation={app.homeRoutingInfo?.location ?? null}
+          />
         )}
 
         {app.currentMode === 'out' && (

@@ -17,8 +17,8 @@ export default defineConfig({
         name: 'PG Train App',
         short_name: 'PG Train',
         description: 'PG Train App',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
         display: 'standalone',
         icons: [
           {
