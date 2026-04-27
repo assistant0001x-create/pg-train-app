@@ -230,6 +230,11 @@ export function useTrainApp() {
           }
         }
 
+        // Distance to home — used to suppress irrelevant tube cards when the user is far away
+        const distToHomeKm = location
+          ? calculateDistance(location.lat, location.lon, HOME_COORDS.lat, HOME_COORDS.lon)
+          : null
+
         // ── 1. GN Train only ─────────────────────────────────────────────────
         const services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
         const trainOption = {
@@ -249,6 +254,10 @@ export function useTrainApp() {
             mapsUrl: trainMapsUrl,
             stationName: station.name,
           } : null,
+          // When station is too far to walk (>10 min / ~800 m) link to TfL Journey Planner
+          tflBoardingUrl: (location && trainWalkMins != null && trainWalkMins > 10)
+            ? buildTflJourneyUrl(location.lat, location.lon, station.lat, station.lon, station.name)
+            : null,
         }
 
         // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
@@ -257,8 +266,6 @@ export function useTrainApp() {
         let tubePlusTrainOption = null
         try {
           const fpkServices = await fetchDepartures(TUBE_TRAIN_INTERCHANGE.crs, PALMERS_GREEN.code, { force })
-          const fpkWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, TUBE_TRAIN_INTERCHANGE.lat, TUBE_TRAIN_INTERCHANGE.lon)) : null
-          const fpkMapsUrl = location ? buildMapsUrl(location, `${TUBE_TRAIN_INTERCHANGE.lat},${TUBE_TRAIN_INTERCHANGE.lon}`, 'walking') : null
           tubePlusTrainOption = {
             id: 'tube-train-fpk',
             type: 'tube+train',
@@ -273,11 +280,10 @@ export function useTrainApp() {
             departures: fpkServices,
             serviceNote: 'Take Piccadilly line to Finsbury Park, then GN train',
             reliableDuration: true,
-            firstLeg: fpkWalkMins != null ? {
-              walkMins: fpkWalkMins,
-              mapsUrl: fpkMapsUrl,
-              stationName: TUBE_TRAIN_INTERCHANGE.name,
-            } : null,
+            // Always show a TfL link — how to reach Finsbury Park depends on current location
+            tflBoardingUrl: location
+              ? buildTflJourneyUrl(location.lat, location.lon, 51.5642, -0.1065, TUBE_TRAIN_INTERCHANGE.name)
+              : null,
           }
         } catch {
           // Non-critical — omit if FPK fetch fails
@@ -286,43 +292,40 @@ export function useTrainApp() {
         // ── 3. Tube only — eastbound arrivals at near-home Piccadilly stations ─
         // TUBE_STATIONS are the alight-here stations (Arnos Grove, Bounds Green, Wood Green).
         // journeyMins = walk from that station to Palmers Green (the final leg home).
-        // walkMins = null because we don't know the user's boarding station on the Piccadilly line.
-        const tubeOptions = await Promise.all(
-          TUBE_STATIONS.map(async (ts) => {
-            let departures = []
-            let serviceNote
-            try {
-              departures = await fetchTubeArrivals(ts.naptanId)
-            } catch {
-              serviceNote = 'Check TfL app for live times'
-            }
-            const walkHome = Math.round(
-              walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
+        // walkMins = null because the boarding station is unknown.
+        // These cards are only useful near home (≤ 2 km). Further away the "board any Piccadilly"
+        // instruction gives no first leg, so suppress rather than show an incomplete card.
+        const tubeOptions = distToHomeKm != null && distToHomeKm > 2
+          ? []
+          : await Promise.all(
+              TUBE_STATIONS.map(async (ts) => {
+                let departures = []
+                let serviceNote
+                try {
+                  departures = await fetchTubeArrivals(ts.naptanId)
+                } catch {
+                  serviceNote = 'Check TfL app for live times'
+                }
+                const walkHome = Math.round(
+                  walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
+                )
+                return {
+                  id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
+                  type: 'tube',
+                  station: { name: ts.name, line: ts.line },
+                  walkMins: null,          // boarding station unknown
+                  journeyMins: walkHome,   // walk from this station to home
+                  destination: HOME_DESTINATION,
+                  line: ts.line,
+                  operator: 'TfL',
+                  mapsUrl: null,
+                  departures,
+                  leaveInMins: null,
+                  serviceNote: serviceNote || 'Board at any Piccadilly line station toward Cockfosters',
+                  reliableDuration: false,
+                }
+              })
             )
-            const tsWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, ts.lat, ts.lon)) : null
-            const tsMapsUrl = location ? buildMapsUrl(location, `${ts.lat},${ts.lon}`, 'walking') : null
-            return {
-              id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
-              type: 'tube',
-              station: { name: ts.name, line: ts.line },
-              walkMins: null,          // boarding station unknown
-              journeyMins: walkHome,   // walk from this station to home
-              destination: HOME_DESTINATION,
-              line: ts.line,
-              operator: 'TfL',
-              mapsUrl: null,
-              departures,
-              leaveInMins: null,
-              serviceNote: serviceNote || 'Board at any Piccadilly line station toward Cockfosters',
-              reliableDuration: false,
-              firstLeg: tsWalkMins != null ? {
-                walkMins: tsWalkMins,
-                mapsUrl: tsMapsUrl,
-                stationName: ts.name,
-              } : null,
-            }
-          })
-        )
 
         // ── 4. Silver Street Overground (east London users only) ─────────────
         // Silver Street is east of Palmers Green. Only relevant when the user is

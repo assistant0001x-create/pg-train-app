@@ -433,6 +433,13 @@ button { font-family: inherit; background: none; border: 0; color: inherit; curs
 .rt-chev { color: var(--fg-4); transition: transform 200ms; display: grid; place-items: center; }
 .rt-chev.is-open { transform: rotate(180deg); color: var(--fg-2); }
 .rt-body { padding: 4px 16px 14px; }
+.rt-first-leg { padding: 0 0 4px; }
+.rt-first-leg-link {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px; color: var(--fg-3);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.rt-first-leg-link:hover { color: var(--accent); }
 
 /* Ribbon */
 .rt-ribbon {

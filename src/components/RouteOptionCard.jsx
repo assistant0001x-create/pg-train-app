@@ -322,6 +322,13 @@ export default function RouteOptionCard({ option, isPreferred, routeStyle = 'rib
         {routeStyle === 'ribbon'   && <RouteRibbon legs={legs} />}
         {routeStyle === 'bars'     && <RouteBars legs={legs} total={total} />}
         {routeStyle === 'timeline' && <RouteTimeline legs={legs} leaveIn={leaveIn} />}
+        {option.tflBoardingUrl && (
+          <div className="rt-first-leg">
+            <a href={option.tflBoardingUrl} target="_blank" rel="noopener noreferrer" className="rt-first-leg-link">
+              How to get there →
+            </a>
+          </div>
+        )}
       </div>
 
       {expanded && (
