@@ -1,4 +1,17 @@
 import { useState } from 'react'
+import { HOME_COORDS } from '../constants/stations'
+
+function buildDirectionsUrl(fromCoords, toCoords) {
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+  const toLoc = `${toCoords.lat},${toCoords.lon}`
+  if (isIOS) {
+    const from = fromCoords ? `${fromCoords.lat},${fromCoords.lon}` : 'Current+Location'
+    return `https://maps.apple.com/?saddr=${from}&daddr=${toLoc}&dirflg=w`
+  }
+  const params = new URLSearchParams({ api: '1', travelmode: 'walking', destination: toLoc })
+  if (fromCoords) params.set('origin', `${fromCoords.lat},${fromCoords.lon}`)
+  return `https://www.google.com/maps/dir/?${params.toString()}`
+}
 
 function minsFromNow(timeStr) {
   if (!timeStr || timeStr === 'On time' || timeStr === 'Delayed') return null
@@ -128,9 +141,12 @@ function getStepSummary(option) {
 
 function buildStages(option) {
   const destStation = option.destination || 'Palmers Green'
+  const stationCoords = option.station?.lat != null
+    ? { lat: option.station.lat, lon: option.station.lon }
+    : null
   switch (option.type) {
     case 'walk':
-      return [{ mode: 'walk', from: 'Current location', to: destStation, mins: option.journeyMins }]
+      return [{ mode: 'walk', from: 'Current location', to: destStation, mins: option.journeyMins, fromCoords: null, toCoords: HOME_COORDS }]
     case 'tube+train':
       return [
         { mode: 'tube', from: 'Current location', to: option.station.name, mins: null },
@@ -139,7 +155,7 @@ function buildStages(option) {
     case 'tube':
       return [
         { mode: 'tube', from: 'Current location', to: option.station.name, mins: null },
-        { mode: 'walk', from: option.station.name, to: destStation, mins: option.journeyMins },
+        { mode: 'walk', from: option.station.name, to: destStation, mins: option.journeyMins, fromCoords: stationCoords, toCoords: HOME_COORDS },
       ]
     case 'overground':
       return [
@@ -148,13 +164,13 @@ function buildStages(option) {
       ]
     case 'bus':
       return [
-        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins },
+        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins, fromCoords: null, toCoords: stationCoords },
         { mode: 'bus', from: option.station.name, to: destStation, mins: null },
       ]
     case 'train':
     default:
       return [
-        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins },
+        { mode: 'walk', from: 'Current location', to: option.station.name, mins: option.walkMins, fromCoords: null, toCoords: stationCoords },
         { mode: 'train', from: option.station.name, to: destStation, mins: option.journeyMins },
       ]
   }
@@ -240,9 +256,22 @@ export default function RouteOptionCard({ option, isPreferred }) {
                     <span className="font-semibold text-white">{stage.to}</span>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-white/50 ml-2 shrink-0">
-                  {stage.mins != null && stage.mins > 0 ? `${stage.mins} min` : '—'}
-                </span>
+                <div className="flex items-center gap-2 ml-2 shrink-0">
+                  <span className="text-xs font-bold text-white/50">
+                    {stage.mins != null && stage.mins > 0 ? `${stage.mins} min` : '—'}
+                  </span>
+                  {stage.mode === 'walk' && stage.toCoords && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        window.open(buildDirectionsUrl(stage.fromCoords, stage.toCoords), '_blank')
+                      }}
+                      className="text-[10px] font-semibold text-amber-400 border border-amber-400/40 rounded-full px-2 py-0.5 active:bg-amber-400/10 transition-colors"
+                    >
+                      ↗ Directions
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
