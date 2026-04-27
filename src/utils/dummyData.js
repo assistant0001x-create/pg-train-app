@@ -73,18 +73,20 @@ export function getDummyRouteOptions() {
       operator: 'Great Northern',
       mapsUrl: null,
       departures: generateTrainDepartures({ offsetMins: 4, intervalMins: 15 }),
+      reliableDuration: true,
     },
     {
       id: 'tube-BGN',
       type: 'tube',
       station: { name: 'Bounds Green', line: 'Piccadilly' },
-      walkMins: 10,
-      journeyMins: 20, // Bounds Green → King's Cross (southbound Piccadilly)
-      destination: "King's Cross St. Pancras",
+      walkMins: null,
+      journeyMins: 12, // walk from Bounds Green to Palmers Green
+      destination: 'Palmers Green',
       line: 'Piccadilly',
       operator: 'TfL',
       mapsUrl: null,
       departures: generateTubeDepartures({ offsetMins: 3, intervalMins: 7 }),
+      reliableDuration: false,
     },
     {
       id: 'train-ALX',
@@ -97,18 +99,20 @@ export function getDummyRouteOptions() {
       operator: 'Great Northern',
       mapsUrl: null,
       departures: generateTrainDepartures({ offsetMins: 8, intervalMins: 15, hasDelay: true }),
+      reliableDuration: true,
     },
     {
       id: 'tube-ARN',
       type: 'tube',
       station: { name: 'Arnos Grove', line: 'Piccadilly' },
-      walkMins: 18,
-      journeyMins: 22, // Arnos Grove → King's Cross (southbound Piccadilly)
-      destination: "King's Cross St. Pancras",
+      walkMins: null,
+      journeyMins: 18, // walk from Arnos Grove to Palmers Green
+      destination: 'Palmers Green',
       line: 'Piccadilly',
       operator: 'TfL',
       mapsUrl: null,
       departures: generateTubeDepartures({ offsetMins: 5, intervalMins: 7 }),
+      reliableDuration: false,
     },
   ]
 }

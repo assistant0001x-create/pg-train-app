@@ -92,7 +92,7 @@ async function getUserLocation() {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       reject,
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60 * 1000 }
     )
   })
 }
@@ -118,6 +118,8 @@ export function useTrainApp() {
   const trackedStatusRef = useRef(null)
   const trackedExpectedRef = useRef(null)
   const trackedNotifiedRef = useRef(false)
+  const requestSeq = useRef(0)
+  const mountedRef = useRef(true)
 
   const setCurrentMode = useCallback((mode) => {
     currentModeRef.current = mode
@@ -132,6 +134,7 @@ export function useTrainApp() {
   const showStatus = useCallback((type, message) => setStatus({ type, message }), [])
 
   const fetchTrains = useCallback(async ({ force = false } = {}) => {
+    const seq = ++requestSeq.current
     setIsLoading(true)
     setWalkingInfo(null)
     const mode = currentModeRef.current
@@ -171,6 +174,7 @@ export function useTrainApp() {
 
         try {
           location = await getUserLocation()
+          if (!mountedRef.current || requestSeq.current !== seq) return
           const nearest = getNearestLocation(location, GREAT_NORTHERN_STATIONS)
           if (nearest) station = nearest
           trainWalkMins = walkingMinutes(location.lat, location.lon, station.lat, station.lon)
@@ -288,7 +292,8 @@ export function useTrainApp() {
               operator: 'TfL',
               mapsUrl: null,
               departures,
-              serviceNote,
+              leaveInMins: null,
+              serviceNote: serviceNote || 'Board at any Piccadilly line station toward Cockfosters',
               reliableDuration: false,
             }
           })
@@ -464,6 +469,7 @@ export function useTrainApp() {
           ...finalLegBusOptions,
         ].sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
 
+        if (!mountedRef.current || requestSeq.current !== seq) return
         setRouteOptions([trainOption, ...otherOptions])
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
@@ -473,6 +479,7 @@ export function useTrainApp() {
 
       // ── OUT mode only below this point ────────────────────────────────────
       let services = await fetchDepartures(fromStation, toCrs, { force })
+      if (!mountedRef.current || requestSeq.current !== seq) return
 
       // Tracking notifications (out mode only)
       const tracked = trackedIDRef.current
@@ -516,20 +523,23 @@ export function useTrainApp() {
       setLastUpdate(new Date())
       showStatus('success', 'Connected. Showing real time trains from National Rail.')
     } catch (error) {
+      if (!mountedRef.current || requestSeq.current !== seq) return
       console.error('Error:', error)
       showStatus('error', `Failed to fetch train times: ${error.message}`)
       setTrains([])
     } finally {
-      setIsLoading(false)
+      if (mountedRef.current && requestSeq.current === seq) setIsLoading(false)
     }
   }, [setTrackedServiceID, showStatus])
 
   // Fetch whenever mode changes (and on mount); auto-refresh every 60s
   useEffect(() => {
     fetchTrains()
-    const interval = setInterval(() => fetchTrains(), 60 * 1000)
+    const interval = setInterval(() => fetchTrains({ force: true }), 60 * 1000)
     return () => clearInterval(interval)
   }, [currentMode, fetchTrains])
+
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const setMode = useCallback((mode) => setCurrentMode(mode), [setCurrentMode])
 

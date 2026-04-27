@@ -99,38 +99,39 @@ function ModeIconSvg({ mode, size = 14, color }) {
 // Build ribbon legs from a route option
 function buildLegs(option) {
   const { type, walkMins, journeyMins, line, tubeLine, station } = option
+  const stationName = station?.name || 'Station'
   switch (type) {
     case 'walk':
-      return [{ mode: 'walk', durMin: journeyMins, label: 'WALK' }]
+      return [{ mode: 'walk', durMin: journeyMins, label: 'WALK', to: 'Home' }]
     case 'train':
       return [
-        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK' } : null,
-        { mode: 'rail', durMin: journeyMins, label: line || 'GN' },
-        { mode: 'walk', durMin: 5, label: 'WALK' },
+        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK', to: stationName } : null,
+        { mode: 'rail', durMin: journeyMins, label: line || 'GN', to: 'Palmers Green' },
+        { mode: 'walk', durMin: 5, label: 'WALK', to: 'Home' },
       ].filter(Boolean)
     case 'tube+train':
       return [
-        { mode: 'tube', durMin: null, label: tubeLine || 'TUBE', lineName: tubeLine },
-        { mode: 'rail', durMin: journeyMins, label: 'GN', lineName: 'Great Northern' },
-        { mode: 'walk', durMin: 5, label: 'WALK' },
+        { mode: 'tube', durMin: null, label: tubeLine || 'TUBE', lineName: tubeLine, to: 'Finsbury Park' },
+        { mode: 'rail', durMin: journeyMins, label: 'GN', lineName: 'Great Northern', to: 'Palmers Green' },
+        { mode: 'walk', durMin: 5, label: 'WALK', to: 'Home' },
       ]
     case 'tube':
       return [
-        { mode: 'tube', durMin: null, label: station?.line || 'TUBE', lineName: station?.line },
-        { mode: 'walk', durMin: journeyMins, label: 'WALK' },
+        { mode: 'tube', durMin: null, label: station?.line || 'TUBE', lineName: station?.line, to: stationName },
+        { mode: 'walk', durMin: journeyMins, label: 'WALK', to: 'Home' },
       ]
     case 'overground':
       return [
-        { mode: 'overground', durMin: null, label: 'OVGD' },
-        { mode: 'bus', durMin: null, label: 'BUS' },
+        { mode: 'overground', durMin: null, label: 'OVGD', to: stationName },
+        { mode: 'bus', durMin: null, label: 'BUS', to: 'Palmers Green' },
       ]
     case 'bus':
       return [
-        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK' } : null,
-        { mode: 'bus', durMin: null, label: line ? `${line}` : 'BUS' },
+        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK', to: stationName } : null,
+        { mode: 'bus', durMin: null, label: line ? `${line}` : 'BUS', to: 'Home' },
       ].filter(Boolean)
     default:
-      return [{ mode: 'rail', durMin: journeyMins, label: line || 'RAIL' }]
+      return [{ mode: 'rail', durMin: journeyMins, label: line || 'RAIL', to: 'Home' }]
   }
 }
 
@@ -223,6 +224,12 @@ function RouteTimeline({ legs, leaveIn }) {
                 <span className="rt-tl-label" style={{ color: c }}>{leg.label}</span>
                 <span className="rt-tl-dur">{leg.durMin != null ? `${leg.durMin} min` : '—'}</span>
               </div>
+              {leg.to && (
+                <div className="rt-tl-detail">
+                  <span className="rt-tl-arrow">→</span>
+                  <span className="rt-tl-to">{leg.to}</span>
+                </div>
+              )}
               <div className="rt-tl-clock">{startClock} – {endClock}</div>
             </div>
           </div>
@@ -245,12 +252,16 @@ export default function RouteOptionCard({ option, isPreferred, routeStyle = 'rib
   const [expanded, setExpanded] = useState(false)
   const { walkMins, journeyMins, departures, serviceNote, reliableDuration } = option
 
-  const catchMin = reliableDuration && journeyMins != null ? firstCatchable(departures, walkMins) : null
+  const catchMin = journeyMins != null ? firstCatchable(departures, walkMins) : null
   const total = option.type === 'walk'
     ? journeyMins
-    : (reliableDuration && catchMin != null && journeyMins != null ? catchMin + journeyMins : null)
+    : (catchMin != null && journeyMins != null ? catchMin + journeyMins : null)
 
-  const leaveIn = catchMin ?? (departures.length > 0 ? firstCatchable(departures, 0) : null)
+  const leaveIn = option.type === 'walk'
+    ? 0
+    : 'leaveInMins' in option && option.leaveInMins === null
+    ? null
+    : catchMin ?? (departures.length > 0 ? firstCatchable(departures, 0) : null)
   const eta = total != null ? arrivalTime(total) : null
 
   const legs = buildLegs(option)
@@ -262,13 +273,19 @@ export default function RouteOptionCard({ option, isPreferred, routeStyle = 'rib
           <div className="rt-leave">
             <span className="rt-leave-k">LEAVE</span>
             <span className="rt-leave-v">
-              {leaveIn != null ? `in ${leaveIn}m` : '—'}
+              {'leaveInMins' in option && option.leaveInMins === null
+                ? 'Check TfL'
+                : leaveIn === 0
+                ? 'now'
+                : leaveIn != null ? `in ${leaveIn}m` : '—'}
             </span>
           </div>
-          <div className="rt-total">
-            <span className="rt-total-num">{total ?? '?'}</span>
-            <span className="rt-total-unit">min</span>
-          </div>
+          {total != null && (
+            <div className="rt-total">
+              <span className="rt-total-num">{total}</span>
+              <span className="rt-total-unit">min</span>
+            </div>
+          )}
           {eta && (
             <div className="rt-eta">
               <span className="rt-eta-k">ARR</span>
