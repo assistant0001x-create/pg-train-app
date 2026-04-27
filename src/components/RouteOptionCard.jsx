@@ -260,8 +260,8 @@ function RouteTimeline({ legs, leaveIn }) {
   )
 }
 
-export default function RouteOptionCard({ option, isPreferred, routeStyle = 'ribbon' }) {
-  const [expanded, setExpanded] = useState(false)
+export default function RouteOptionCard({ option, isPreferred, routeStyle = 'ribbon', defaultExpanded = false }) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const { walkMins, firstLeg, journeyMins, departures, serviceNote, reliableDuration } = option
 
   // Effective walk to boarding station — firstLeg wins over legacy walkMins

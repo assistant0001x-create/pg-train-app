@@ -10,14 +10,12 @@ function PinIcon({ size = 12, color = 'currentColor' }) {
   )
 }
 
-export default function HomeOptions({ routeOptions, isLoading, userLocation, routeStyle = 'ribbon' }) {
+export default function HomeOptions({ routeOptions, isLoading, userLocation, routeStyle = 'ribbon', mockLocation }) {
   const preferred = routeOptions?.[0] ?? null
-  const others = routeOptions?.slice(1) ?? []
+  const preferredIsGN = preferred?.isPreferredGN ?? false
+  const multimodal = preferredIsGN ? (routeOptions?.[1] ?? null) : null
+  const fallbackOptions = !preferredIsGN ? (routeOptions ?? []) : []
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
-
-  const fromLabel = userLocation
-    ? `${userLocation.lat.toFixed(3)}, ${userLocation.lon.toFixed(3)}`
-    : 'Current location'
 
   if (isLoading && !preferred) {
     return (
@@ -38,6 +36,11 @@ export default function HomeOptions({ routeOptions, isLoading, userLocation, rou
             </div>
           </div>
         </div>
+        {mockLocation && (
+          <div className="mock-loc-banner">
+            Mock location active — {mockLocation.lat.toFixed(4)}, {mockLocation.lon.toFixed(4)}
+          </div>
+        )}
         <div className="loading-state" style={{ padding: '28px 20px' }}>
           <span className="loading-label">Finding routes near you…</span>
         </div>
@@ -64,15 +67,44 @@ export default function HomeOptions({ routeOptions, isLoading, userLocation, rou
         </div>
       </div>
 
-      {preferred && (
+      {mockLocation && (
+        <div className="mock-loc-banner">
+          Mock location active — {mockLocation.lat.toFixed(4)}, {mockLocation.lon.toFixed(4)}
+        </div>
+      )}
+
+      {preferred && preferredIsGN && (
+        <div>
+          <div className="section-head">
+            <span className="section-title">Best route home</span>
+            <span className="section-meta">Great Northern · live</span>
+          </div>
+          <div className="rt-list">
+            <RouteOptionCard option={preferred} isPreferred defaultExpanded routeStyle={routeStyle} />
+          </div>
+
+          {multimodal && (
+            <>
+              <div className="section-head" style={{ marginTop: 16 }}>
+                <span className="section-title">Alternative</span>
+                <span className="section-meta">1 option</span>
+              </div>
+              <div className="rt-list">
+                <RouteOptionCard key={multimodal.id} option={multimodal} routeStyle={routeStyle} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {preferred && !preferredIsGN && (
         <div>
           <div className="section-head">
             <span className="section-title">Routes home</span>
-            <span className="section-meta">{routeOptions.length} option{routeOptions.length !== 1 ? 's' : ''} · live</span>
+            <span className="section-meta">{fallbackOptions.length} option{fallbackOptions.length !== 1 ? 's' : ''} · live</span>
           </div>
           <div className="rt-list">
-            <RouteOptionCard option={preferred} isPreferred routeStyle={routeStyle} />
-            {others.map((option) => (
+            {fallbackOptions.map((option) => (
               <RouteOptionCard key={option.id} option={option} routeStyle={routeStyle} />
             ))}
           </div>

@@ -37,6 +37,7 @@ export default function App() {
             isLoading={app.isLoading}
             userLocation={app.homeRoutingInfo?.location ?? null}
             routeStyle={tweaks.routeStyle}
+            mockLocation={app.mockLocation}
           />
         )}
 

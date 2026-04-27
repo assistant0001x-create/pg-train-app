@@ -393,6 +393,19 @@ button { font-family: inherit; background: none; border: 0; color: inherit; curs
 }
 .from-row-v { font-size: 13px; font-weight: 600; margin-top: 1px; }
 
+.mock-loc-banner {
+  margin: 8px 0 2px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: oklch(28% 0.1 60 / 0.25);
+  border: 1px solid oklch(60% 0.12 60 / 0.45);
+  color: oklch(82% 0.12 60);
+  font-size: 11px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
 /* ── Route cards ────────────────────────────────────────────── */
 .rt-list { display: flex; flex-direction: column; gap: 10px; }
 .rt {

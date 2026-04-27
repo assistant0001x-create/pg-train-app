@@ -91,7 +91,20 @@ function sendNotification(title, body) {
   new Notification(title, { body, icon: '🚂' })
 }
 
-async function getUserLocation() {
+function parseMockLocation() {
+  try {
+    const raw = new URLSearchParams(window.location.search).get('mockLoc')
+    if (!raw) return null
+    const [lat, lon] = raw.split(',').map(Number)
+    if (isNaN(lat) || isNaN(lon)) return null
+    return { lat, lon }
+  } catch {
+    return null
+  }
+}
+
+async function getUserLocation(mockOverride) {
+  if (mockOverride) return mockOverride
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported'))
     navigator.geolocation.getCurrentPosition(
@@ -103,6 +116,9 @@ async function getUserLocation() {
 }
 
 export function useTrainApp() {
+  const mockLocationRef = useRef(parseMockLocation())
+  const [mockLocation] = useState(mockLocationRef.current)
+
   // Rendering state
   const [currentMode, setCurrentModeState] = useState('out')
   const [trains, setTrains] = useState([])
@@ -179,7 +195,7 @@ export function useTrainApp() {
         let trainMapsUrl = null
 
         try {
-          location = await getUserLocation()
+          location = await getUserLocation(mockLocationRef.current)
           if (!mountedRef.current || requestSeq.current !== seq) return
           const nearest = getNearestLocation(location, GREAT_NORTHERN_STATIONS)
           if (nearest) station = nearest
@@ -362,7 +378,7 @@ export function useTrainApp() {
             )
           : []
 
-        const allOptions = [
+        const allFiltered = [
           trainOption,
           ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
           ...tubeOptions,
@@ -370,10 +386,20 @@ export function useTrainApp() {
         ]
           .filter((opt) => opt.walkMins == null || opt.walkMins <= 30)
           .sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
-          .slice(0, 3)
+
+        const gnOptions = allFiltered.filter((opt) => opt.type === 'train' || opt.type === 'tube+train')
+        const nonGnOptions = allFiltered.filter((opt) => opt.type !== 'train' && opt.type !== 'tube+train')
+
+        let displayOptions
+        if (gnOptions.length > 0) {
+          const preferred = { ...gnOptions[0], isPreferredGN: true }
+          displayOptions = nonGnOptions.length > 0 ? [preferred, nonGnOptions[0]] : [preferred]
+        } else {
+          displayOptions = allFiltered.slice(0, 2)
+        }
 
         if (!mountedRef.current || requestSeq.current !== seq) return
-        setRouteOptions(allOptions)
+        setRouteOptions(displayOptions)
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')
@@ -492,6 +518,7 @@ export function useTrainApp() {
     lastUpdate,
     walkingInfo,
     homeRoutingInfo,
+    mockLocation,
     trackedServiceID,
     trackTrain,
     fetchTrains,
