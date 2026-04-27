@@ -430,7 +430,6 @@ export function useTrainApp() {
                 route,
                 stop,
                 departures,
-                stopWalkMins: Math.round(walkingMinutes(ts.lat, ts.lon, stop.lat, stop.lon)),
               }))
             } catch {
               return []
@@ -445,11 +444,11 @@ export function useTrainApp() {
             shownRoutes.add(route.toLowerCase())
             return true
           })
-          .map(({ fromTubeStation, route, stop, departures, stopWalkMins }) => ({
+          .map(({ fromTubeStation, route, stop, departures }) => ({
             id: `bus-final-${route.toLowerCase()}-${fromTubeStation.replace(/\s+/g, '-').toLowerCase()}`,
             type: 'bus',
             station: { name: stop.name, line: route },
-            walkMins: stopWalkMins,
+            walkMins: null,
             journeyMins: null,
             destination: HOME_DESTINATION,
             line: route,
