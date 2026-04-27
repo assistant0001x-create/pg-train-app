@@ -12,7 +12,7 @@ import {
   TUBE_STATION_BUS_ROUTES,
   OVERGROUND_STATIONS,
 } from '../constants/stations'
-import { getNearestLocation, walkingMinutes } from '../utils/distance'
+import { calculateDistance, getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
 import { fetchDepartures, fetchTubeArrivals, fetchOvergroundArrivals, fetchNearbyBusOptions } from '../utils/trainApi'
 import { getDummyRouteOptions } from '../utils/dummyData'
