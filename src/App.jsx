@@ -27,6 +27,7 @@ export default function App() {
           notificationsGranted={app.notificationsGranted}
           requestNotifications={app.requestNotifications}
           headerStyle={tweaks.headerStyle}
+          locationLabel={app.locationLabel}
         />
 
         <StatusMessage status={app.status} />

@@ -36,7 +36,7 @@ function PinIcon({ size = 14 }) {
   )
 }
 
-export default function Header({ currentMode, setMode, isLoading, fetchTrains, lastUpdate, notificationsGranted, requestNotifications, headerStyle = 'compact' }) {
+export default function Header({ currentMode, setMode, isLoading, fetchTrains, lastUpdate, notificationsGranted, requestNotifications, headerStyle = 'compact', locationLabel }) {
   const isOut = currentMode === 'out'
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
   const updateText = lastUpdate
@@ -52,7 +52,7 @@ export default function Header({ currentMode, setMode, isLoading, fetchTrains, l
           <div className="hdr-sub">
             {isOut
               ? <>Palmers Green <span className="arr">→</span> Moorgate</>
-              : <>Current location <span className="arr">→</span> {homeLabel}</>}
+              : <><span className="hdr-location-label" title={locationLabel || 'Current location'}>{locationLabel || 'Current location'}</span> <span className="arr">→</span> {homeLabel}</>}
           </div>
         </div>
         <button

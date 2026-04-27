@@ -91,6 +91,24 @@ function sendNotification(title, body) {
   new Notification(title, { body, icon: '🚂' })
 }
 
+async function reverseGeocode(lat, lon) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+      { headers: { 'Accept-Language': 'en-GB' } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const { house_number, road, postcode } = data.address || {}
+    if (!road) return null
+    const street = house_number ? `${house_number} ${road}` : road
+    const district = postcode ? postcode.split(' ')[0] : null
+    return district ? `${street}, ${district}` : street
+  } catch {
+    return null
+  }
+}
+
 function parseMockLocation() {
   try {
     const raw = new URLSearchParams(window.location.search).get('mockLoc')
@@ -129,6 +147,7 @@ export function useTrainApp() {
   const [homeRoutingInfo, setHomeRoutingInfo] = useState(null)
   const [routeOptions, setRouteOptions] = useState([])
   const [trackedServiceID, setTrackedServiceIDState] = useState(null)
+  const [locationLabel, setLocationLabel] = useState(null)
   const [notificationsGranted, setNotificationsGranted] = useState(
     typeof Notification !== 'undefined' && Notification.permission === 'granted'
   )
@@ -194,9 +213,14 @@ export function useTrainApp() {
         let effectiveTrainWalkMins = null
         let trainMapsUrl = null
 
+        setLocationLabel(null)
+
         try {
           location = await getUserLocation(mockLocationRef.current)
           if (!mountedRef.current || requestSeq.current !== seq) return
+          reverseGeocode(location.lat, location.lon).then((label) => {
+            if (label && mountedRef.current) setLocationLabel(label)
+          })
           const nearest = getNearestLocation(location, GREAT_NORTHERN_STATIONS)
           if (nearest) station = nearest
           trainWalkMins = walkingMinutes(location.lat, location.lon, station.lat, station.lon)
@@ -519,6 +543,7 @@ export function useTrainApp() {
     walkingInfo,
     homeRoutingInfo,
     mockLocation,
+    locationLabel,
     trackedServiceID,
     trackTrain,
     fetchTrains,
