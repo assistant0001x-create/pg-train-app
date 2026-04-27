@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0e1223"/>
+  <text x="256" y="310" font-family="system-ui,sans-serif" font-size="230" font-weight="800" text-anchor="middle" fill="#f5a31a" letter-spacing="-8">PG</text>
+  <rect x="96" y="332" width="320" height="16" rx="8" fill="#f5a31a"/>
+</svg>
