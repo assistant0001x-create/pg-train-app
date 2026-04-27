@@ -30,6 +30,12 @@ const JOURNEY_MINS_TO_PAL = {
   WGC: 4,  GAN: 6,  ENF: 9,  GNT: 12, CWN: 15, CHN: 18,
 }
 
+// Builds a TfL Journey Planner deep link from the user's current GPS to a boarding station.
+// Hands off to TfL rather than calculating the first leg ourselves.
+function buildTflJourneyUrl(fromLat, fromLon, toLat, toLon, toName) {
+  return `https://tfl.gov.uk/plan-a-journey/?fromName=Current+Location&from=${fromLat},${fromLon}&toName=${encodeURIComponent(toName)}&to=${toLat},${toLon}`
+}
+
 function getServiceStatus(service) {
   if (service.isCancelled) return 'cancelled'
   const scheduled = service.std || service.sta
@@ -238,6 +244,11 @@ export function useTrainApp() {
           mapsUrl: trainMapsUrl,
           departures: services,
           reliableDuration: true,
+          firstLeg: trainWalkMins != null ? {
+            walkMins: trainWalkMins,
+            mapsUrl: trainMapsUrl,
+            stationName: station.name,
+          } : null,
         }
 
         // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
@@ -246,6 +257,8 @@ export function useTrainApp() {
         let tubePlusTrainOption = null
         try {
           const fpkServices = await fetchDepartures(TUBE_TRAIN_INTERCHANGE.crs, PALMERS_GREEN.code, { force })
+          const fpkWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, TUBE_TRAIN_INTERCHANGE.lat, TUBE_TRAIN_INTERCHANGE.lon)) : null
+          const fpkMapsUrl = location ? buildMapsUrl(location, `${TUBE_TRAIN_INTERCHANGE.lat},${TUBE_TRAIN_INTERCHANGE.lon}`, 'walking') : null
           tubePlusTrainOption = {
             id: 'tube-train-fpk',
             type: 'tube+train',
@@ -260,6 +273,11 @@ export function useTrainApp() {
             departures: fpkServices,
             serviceNote: 'Take Piccadilly line to Finsbury Park, then GN train',
             reliableDuration: true,
+            firstLeg: fpkWalkMins != null ? {
+              walkMins: fpkWalkMins,
+              mapsUrl: fpkMapsUrl,
+              stationName: TUBE_TRAIN_INTERCHANGE.name,
+            } : null,
           }
         } catch {
           // Non-critical — omit if FPK fetch fails
@@ -281,6 +299,8 @@ export function useTrainApp() {
             const walkHome = Math.round(
               walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
             )
+            const tsWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, ts.lat, ts.lon)) : null
+            const tsMapsUrl = location ? buildMapsUrl(location, `${ts.lat},${ts.lon}`, 'walking') : null
             return {
               id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
               type: 'tube',
@@ -295,6 +315,11 @@ export function useTrainApp() {
               leaveInMins: null,
               serviceNote: serviceNote || 'Board at any Piccadilly line station toward Cockfosters',
               reliableDuration: false,
+              firstLeg: tsWalkMins != null ? {
+                walkMins: tsWalkMins,
+                mapsUrl: tsMapsUrl,
+                stationName: ts.name,
+              } : null,
             }
           })
         )
@@ -315,6 +340,8 @@ export function useTrainApp() {
                 } catch {
                   serviceNote = 'Check TfL app for live times'
                 }
+                const osWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, os.lat, os.lon)) : null
+                const osMapsUrl = location ? buildMapsUrl(location, `${os.lat},${os.lon}`, 'walking') : null
                 return {
                   id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
                   type: 'overground',
@@ -328,6 +355,11 @@ export function useTrainApp() {
                   departures,
                   serviceNote: serviceNote || 'Alight here then bus 102 to Palmers Green',
                   reliableDuration: false,
+                  firstLeg: osWalkMins != null ? {
+                    walkMins: osWalkMins,
+                    mapsUrl: osMapsUrl,
+                    stationName: os.name,
+                  } : null,
                 }
               })
             )
@@ -342,7 +374,7 @@ export function useTrainApp() {
 
             // Generic nearby bus routes home
             busOptions = busData.map(({ route, stop, departures }) => {
-              const stopWalkMins = walkingMinutes(location.lat, location.lon, stop.lat, stop.lon)
+              const stopWalkMins = Math.round(walkingMinutes(location.lat, location.lon, stop.lat, stop.lon))
               const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
               return {
                 id: `bus-${route.toLowerCase()}-${stop.id}`,
@@ -356,6 +388,7 @@ export function useTrainApp() {
                 mapsUrl: stopMapsUrl,
                 departures,
                 reliableDuration: false,
+                firstLeg: { walkMins: stopWalkMins, mapsUrl: stopMapsUrl, stationName: stop.name },
               }
             })
 
@@ -410,6 +443,7 @@ export function useTrainApp() {
                   departures,
                   serviceNote: `Bus feeder to ${target.stationType === 'train' ? 'train' : 'tube'} at ${target.stationName}`,
                   reliableDuration: false,
+                  firstLeg: { walkMins: stopWalkMins, mapsUrl: stopMapsUrl, stationName: stop.name },
                 })
               })
             })

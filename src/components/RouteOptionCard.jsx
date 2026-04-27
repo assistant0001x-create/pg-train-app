@@ -98,41 +98,53 @@ function ModeIconSvg({ mode, size = 14, color }) {
 
 // Build ribbon legs from a route option
 function buildLegs(option) {
-  const { type, walkMins, journeyMins, line, tubeLine, station } = option
+  const { type, walkMins, firstLeg, journeyMins, line, tubeLine, station } = option
   const stationName = station?.name || 'Station'
+
+  let legs
   switch (type) {
     case 'walk':
       return [{ mode: 'walk', durMin: journeyMins, label: 'WALK', to: 'Home' }]
     case 'train':
-      return [
-        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK', to: stationName } : null,
+      legs = [
         { mode: 'rail', durMin: journeyMins, label: line || 'GN', to: 'Palmers Green' },
         { mode: 'walk', durMin: 5, label: 'WALK', to: 'Home' },
-      ].filter(Boolean)
+      ]
+      break
     case 'tube+train':
-      return [
+      legs = [
         { mode: 'tube', durMin: null, label: tubeLine || 'TUBE', lineName: tubeLine, to: 'Finsbury Park' },
         { mode: 'rail', durMin: journeyMins, label: 'GN', lineName: 'Great Northern', to: 'Palmers Green' },
         { mode: 'walk', durMin: 5, label: 'WALK', to: 'Home' },
       ]
+      break
     case 'tube':
-      return [
+      legs = [
         { mode: 'tube', durMin: null, label: station?.line || 'TUBE', lineName: station?.line, to: stationName },
         { mode: 'walk', durMin: journeyMins, label: 'WALK', to: 'Home' },
       ]
+      break
     case 'overground':
-      return [
+      legs = [
         { mode: 'overground', durMin: null, label: 'OVGD', to: stationName },
         { mode: 'bus', durMin: null, label: 'BUS', to: 'Palmers Green' },
       ]
+      break
     case 'bus':
-      return [
-        walkMins ? { mode: 'walk', durMin: walkMins, label: 'WALK', to: stationName } : null,
-        { mode: 'bus', durMin: null, label: line ? `${line}` : 'BUS', to: 'Home' },
-      ].filter(Boolean)
+      legs = [{ mode: 'bus', durMin: null, label: line ? `${line}` : 'BUS', to: 'Home' }]
+      break
     default:
-      return [{ mode: 'rail', durMin: journeyMins, label: line || 'RAIL', to: 'Home' }]
+      legs = [{ mode: 'rail', durMin: journeyMins, label: line || 'RAIL', to: 'Home' }]
   }
+
+  // Prepend first-leg walk from user's current GPS to the boarding station.
+  // firstLeg takes priority; fall back to legacy walkMins for backwards compat.
+  const flWalkMins = firstLeg?.walkMins ?? walkMins
+  const flName = firstLeg?.stationName ?? stationName
+  if (flWalkMins != null) {
+    return [{ mode: 'walk', durMin: flWalkMins, label: 'WALK', to: flName }, ...legs]
+  }
+  return legs
 }
 
 function legColor(leg) {
@@ -250,14 +262,21 @@ function RouteTimeline({ legs, leaveIn }) {
 
 export default function RouteOptionCard({ option, isPreferred, routeStyle = 'ribbon' }) {
   const [expanded, setExpanded] = useState(false)
-  const { walkMins, journeyMins, departures, serviceNote, reliableDuration } = option
+  const { walkMins, firstLeg, journeyMins, departures, serviceNote, reliableDuration } = option
 
-  const catchMin = journeyMins != null ? firstCatchable(departures, walkMins) : null
+  // Effective walk to boarding station — firstLeg wins over legacy walkMins
+  const firstLegWalkMins = firstLeg?.walkMins ?? walkMins
+
+  const catchMin = journeyMins != null ? firstCatchable(departures, firstLegWalkMins) : null
   const total = option.type === 'walk'
     ? journeyMins
     : (catchMin != null && journeyMins != null ? catchMin + journeyMins : null)
 
+  // For tube/overground (leaveInMins: null), if the walk to the boarding station
+  // is > 20 min show "Now" — user needs to start moving regardless of transit schedule.
   const leaveIn = option.type === 'walk'
+    ? 0
+    : 'leaveInMins' in option && option.leaveInMins === null && firstLegWalkMins > 20
     ? 0
     : 'leaveInMins' in option && option.leaveInMins === null
     ? null
@@ -265,6 +284,7 @@ export default function RouteOptionCard({ option, isPreferred, routeStyle = 'rib
   const eta = total != null ? arrivalTime(total) : null
 
   const legs = buildLegs(option)
+  const farFirstLeg = firstLegWalkMins != null && firstLegWalkMins > 20
 
   return (
     <div className={`rt${isPreferred ? ' is-primary' : ''}${expanded ? ' is-expanded' : ''}`}>
@@ -308,6 +328,31 @@ export default function RouteOptionCard({ option, isPreferred, routeStyle = 'rib
         <div className="rt-expand">
           {routeStyle !== 'timeline' && (
             <RouteTimeline legs={legs} leaveIn={leaveIn} />
+          )}
+
+          {farFirstLeg && (
+            <div style={{
+              marginTop: 10,
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: 'oklch(28% 0.06 80 / 0.2)',
+              border: '1px solid oklch(50% 0.1 80 / 0.4)',
+              color: 'var(--warn)',
+              fontSize: 12,
+              fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+            }}>
+              {firstLegWalkMins} min walk to {firstLeg?.stationName} — consider transit to get there
+              {firstLeg?.mapsUrl && (
+                <a
+                  href={firstLeg.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'block', marginTop: 6, color: 'var(--accent)', textDecoration: 'underline', fontSize: 11 }}
+                >
+                  Get directions →
+                </a>
+              )}
+            </div>
           )}
 
           {serviceNote && <div className="note-banner">{serviceNote}</div>}

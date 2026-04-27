@@ -35,6 +35,8 @@ export const TUBE_TRAIN_INTERCHANGE = {
   naptanId: '940GZZLUFPK',
   name: 'Finsbury Park',
   crs: 'FPK',
+  lat: 51.5642,
+  lon: -0.1065,
 }
 
 export const HOME_ADDRESS = import.meta.env.VITE_HOME_ADDRESS || ''
