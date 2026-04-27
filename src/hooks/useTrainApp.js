@@ -9,12 +9,11 @@ import {
   HOME_ADDRESS,
   MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
-  TUBE_STATION_BUS_ROUTES,
   OVERGROUND_STATIONS,
 } from '../constants/stations'
 import { calculateDistance, getNearestLocation, walkingMinutes } from '../utils/distance'
 import { buildMapsUrl } from '../utils/maps'
-import { fetchDepartures, fetchTubeArrivals, fetchOvergroundArrivals, fetchNearbyBusOptions } from '../utils/trainApi'
+import { fetchDepartures, fetchTubeArrivals, fetchOvergroundArrivals, fetchFirstLegMinutes } from '../utils/trainApi'
 import { getDummyRouteOptions } from '../utils/dummyData'
 
 // Set VITE_DUMMY_MODE=false in .env to use the live API
@@ -176,6 +175,7 @@ export function useTrainApp() {
         let station = GREAT_NORTHERN_STATIONS.find((s) => s.code === 'FPK') || GREAT_NORTHERN_STATIONS[0]
         let location = null
         let trainWalkMins = null
+        let effectiveTrainWalkMins = null
         let trainMapsUrl = null
 
         try {
@@ -184,6 +184,11 @@ export function useTrainApp() {
           const nearest = getNearestLocation(location, GREAT_NORTHERN_STATIONS)
           if (nearest) station = nearest
           trainWalkMins = walkingMinutes(location.lat, location.lon, station.lat, station.lon)
+          effectiveTrainWalkMins = trainWalkMins
+          if (trainWalkMins > MAX_WALK_MINUTES) {
+            const realMins = await fetchFirstLegMinutes(location.lat, location.lon, station.lat, station.lon)
+            if (realMins != null) effectiveTrainWalkMins = realMins
+          }
           const travelMode = trainWalkMins <= MAX_WALK_MINUTES ? 'walking' : 'transit'
           trainMapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
           setWalkingInfo({ trainWalkMins, station, mapsUrl: trainMapsUrl, travelMode, locationError: false })
@@ -241,7 +246,7 @@ export function useTrainApp() {
           id: `train-${station.code}`,
           type: 'train',
           station: { code: station.code, name: station.name },
-          walkMins: trainWalkMins,
+          walkMins: effectiveTrainWalkMins,
           journeyMins: JOURNEY_MINS_TO_PAL[station.code] || null,
           destination: PALMERS_GREEN.name,
           line: 'Great Northern',
@@ -249,15 +254,10 @@ export function useTrainApp() {
           mapsUrl: trainMapsUrl,
           departures: services,
           reliableDuration: true,
-          firstLeg: trainWalkMins != null ? {
-            walkMins: trainWalkMins,
-            mapsUrl: trainMapsUrl,
+          firstLeg: effectiveTrainWalkMins != null ? {
+            walkMins: effectiveTrainWalkMins,
             stationName: station.name,
           } : null,
-          // When station is too far to walk (>10 min / ~800 m) link to TfL Journey Planner
-          tflBoardingUrl: (location && trainWalkMins != null && trainWalkMins > 10)
-            ? buildTflJourneyUrl(location.lat, location.lon, station.lat, station.lon, station.name)
-            : null,
         }
 
         // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
@@ -280,10 +280,6 @@ export function useTrainApp() {
             departures: fpkServices,
             serviceNote: 'Take Piccadilly line to Finsbury Park, then GN train',
             reliableDuration: true,
-            // Always show a TfL link — how to reach Finsbury Park depends on current location
-            tflBoardingUrl: location
-              ? buildTflJourneyUrl(location.lat, location.lon, 51.5642, -0.1065, TUBE_TRAIN_INTERCHANGE.name)
-              : null,
           }
         } catch {
           // Non-critical — omit if FPK fetch fails
@@ -344,7 +340,6 @@ export function useTrainApp() {
                   serviceNote = 'Check TfL app for live times'
                 }
                 const osWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, os.lat, os.lon)) : null
-                const osMapsUrl = location ? buildMapsUrl(location, `${os.lat},${os.lon}`, 'walking') : null
                 return {
                   id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
                   type: 'overground',
@@ -360,7 +355,6 @@ export function useTrainApp() {
                   reliableDuration: false,
                   firstLeg: osWalkMins != null ? {
                     walkMins: osWalkMins,
-                    mapsUrl: osMapsUrl,
                     stationName: os.name,
                   } : null,
                 }
@@ -368,145 +362,18 @@ export function useTrainApp() {
             )
           : []
 
-        // ── 5. Bus options near user GPS + feeder buses for long walks ──────
-        let busOptions = []
-        let feederBusOptions = []
-        if (location) {
-          try {
-            const busData = await fetchNearbyBusOptions(location.lat, location.lon)
-
-            // Generic nearby bus routes home
-            busOptions = busData.map(({ route, stop, departures }) => {
-              const stopWalkMins = Math.round(walkingMinutes(location.lat, location.lon, stop.lat, stop.lon))
-              const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
-              return {
-                id: `bus-${route.toLowerCase()}-${stop.id}`,
-                type: 'bus',
-                station: { name: stop.name, line: route },
-                walkMins: stopWalkMins,
-                journeyMins: null,
-                destination: HOME_DESTINATION,
-                line: route,
-                operator: 'TfL',
-                mapsUrl: stopMapsUrl,
-                departures,
-                reliableDuration: false,
-                firstLeg: { walkMins: stopWalkMins, mapsUrl: stopMapsUrl, stationName: stop.name },
-              }
-            })
-
-            // If walk to a train/tube station is > 15 min, add a bus-to-station option
-            const longWalkTargets = []
-            if (trainWalkMins != null && trainWalkMins > MAX_WALK_MINUTES) {
-              longWalkTargets.push({
-                key: `train-${station.code}`,
-                stationName: station.name,
-                stationType: 'train',
-                stationCode: station.code,
-                allowedRoutes: null,
-              })
-            }
-
-            TUBE_STATIONS.forEach((ts) => {
-              const walkToTube = Math.round(walkingMinutes(location.lat, location.lon, ts.lat, ts.lon))
-              if (walkToTube > MAX_WALK_MINUTES) {
-                longWalkTargets.push({
-                  key: `tube-${ts.naptanId}`,
-                  stationName: ts.name,
-                  stationType: 'tube',
-                  stationCode: ts.naptanId,
-                  allowedRoutes: (TUBE_STATION_BUS_ROUTES[ts.naptanId] || []).map((r) => r.toLowerCase()),
-                })
-              }
-            })
-
-            const seenFeeder = new Set()
-            longWalkTargets.forEach((target) => {
-              busData.forEach(({ route, stop, departures }) => {
-                const routeKey = route.toLowerCase()
-                if (target.allowedRoutes && !target.allowedRoutes.includes(routeKey)) return
-
-                const id = `bus-feeder-${target.key}-${routeKey}`
-                if (seenFeeder.has(id)) return
-                seenFeeder.add(id)
-
-                const stopWalkMins = Math.round(walkingMinutes(location.lat, location.lon, stop.lat, stop.lon))
-                const stopMapsUrl = buildMapsUrl(location, `${stop.lat},${stop.lon}`, 'walking')
-
-                feederBusOptions.push({
-                  id,
-                  type: 'bus',
-                  station: { name: stop.name, line: route },
-                  walkMins: stopWalkMins,
-                  journeyMins: null,
-                  destination: target.stationName,
-                  line: route,
-                  operator: 'TfL',
-                  mapsUrl: stopMapsUrl,
-                  departures,
-                  serviceNote: `Bus feeder to ${target.stationType === 'train' ? 'train' : 'tube'} at ${target.stationName}`,
-                  reliableDuration: false,
-                  firstLeg: { walkMins: stopWalkMins, mapsUrl: stopMapsUrl, stationName: stop.name },
-                })
-              })
-            })
-          } catch (e) {
-            console.warn('Bus options failed:', e)
-          }
-        }
-
-        // ── 5b. Final-leg buses near each tube alight station ─────────────────
-        const finalLegRaw = (await Promise.all(
-          TUBE_STATIONS.map(async (ts) => {
-            const walkHome = walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
-            if (walkHome <= MAX_WALK_MINUTES) return []
-            try {
-              const data = await fetchNearbyBusOptions(ts.lat, ts.lon)
-              return data.map(({ route, stop, departures }) => ({
-                fromTubeStation: ts.name,
-                route,
-                stop,
-                departures,
-              }))
-            } catch {
-              return []
-            }
-          })
-        )).flat()
-
-        const shownRoutes = new Set([...busOptions, ...feederBusOptions].map((b) => b.line.toLowerCase()))
-        const finalLegBusOptions = finalLegRaw
-          .filter(({ route }) => {
-            if (shownRoutes.has(route.toLowerCase())) return false
-            shownRoutes.add(route.toLowerCase())
-            return true
-          })
-          .map(({ fromTubeStation, route, stop, departures }) => ({
-            id: `bus-final-${route.toLowerCase()}-${fromTubeStation.replace(/\s+/g, '-').toLowerCase()}`,
-            type: 'bus',
-            station: { name: stop.name, line: route },
-            walkMins: null,
-            journeyMins: null,
-            destination: HOME_DESTINATION,
-            line: route,
-            operator: 'TfL',
-            mapsUrl: null,
-            departures,
-            serviceNote: `From ${fromTubeStation} → Palmers Green`,
-            reliableDuration: false,
-          }))
-
-        const otherOptions = [
+        const allOptions = [
+          trainOption,
           ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
           ...tubeOptions,
           ...overgroundOptions,
-          ...busOptions,
-          ...feederBusOptions,
-          ...finalLegBusOptions,
-        ].sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
+        ]
+          .filter((opt) => opt.walkMins == null || opt.walkMins <= 30)
+          .sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
+          .slice(0, 3)
 
         if (!mountedRef.current || requestSeq.current !== seq) return
-        setRouteOptions([trainOption, ...otherOptions])
+        setRouteOptions(allOptions)
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
         showStatus('success', 'Connected. Showing live departures.')

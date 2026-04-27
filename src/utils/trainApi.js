@@ -46,6 +46,32 @@ function writeCache(fromCrs, toCrs, data) {
   }
 }
 
+const FIRST_LEG_CACHE_TTL_MS = 5 * 60 * 1000
+const firstLegCache = new Map()
+
+export async function fetchFirstLegMinutes(fromLat, fromLon, toLat, toLon) {
+  const key = `${fromLat.toFixed(4)},${fromLon.toFixed(4)}->${toLat.toFixed(4)},${toLon.toFixed(4)}`
+  const cached = firstLegCache.get(key)
+  if (cached && Date.now() - cached.ts < FIRST_LEG_CACHE_TTL_MS) return cached.mins
+
+  try {
+    const params = new URLSearchParams({ mode: 'tube,bus,walking,overground,elizabeth-line' })
+    if (TFL_KEY) params.set('app_key', TFL_KEY)
+    const res = await fetch(
+      `${TFL_BASE}/journey/journeyresults/${fromLat},${fromLon}/to/${toLat},${toLon}?${params}`
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const journeys = data.journeys || []
+    if (journeys.length === 0) return null
+    const mins = Math.min(...journeys.map((j) => j.duration))
+    firstLegCache.set(key, { ts: Date.now(), mins })
+    return mins
+  } catch {
+    return null
+  }
+}
+
 export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
   if (!API_KEY) throw new Error('RDG API key not configured.')
 
