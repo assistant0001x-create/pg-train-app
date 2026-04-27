@@ -64,7 +64,7 @@ function NextUpHero({ train }) {
   )
 }
 
-export default function TrainList({ trains, isLoading, trackedServiceID, onTrack }) {
+export default function TrainList({ trains, isLoading, trackedServiceID, onTrack, cardStyle = 'rich' }) {
   if (isLoading && trains.length === 0) {
     return (
       <div className="loading-state">
@@ -101,6 +101,7 @@ export default function TrainList({ trains, isLoading, trackedServiceID, onTrack
                 train={train}
                 trackedServiceID={trackedServiceID}
                 onTrack={onTrack}
+                cardStyle={cardStyle}
               />
             ))}
           </div>

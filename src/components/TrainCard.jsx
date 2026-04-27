@@ -19,7 +19,7 @@ function ChevDownIcon() {
   )
 }
 
-export default function TrainCard({ train, trackedServiceID, onTrack }) {
+export default function TrainCard({ train, trackedServiceID, onTrack, cardStyle = 'rich' }) {
   const [expanded, setExpanded] = useState(false)
   const scheduled = train.std || train.sta || 'TBC'
   const expected = train.etd || train.eta
@@ -35,6 +35,25 @@ export default function TrainCard({ train, trackedServiceID, onTrack }) {
   const statusColor = isCancelled ? 'var(--danger)' : isDelayed ? 'var(--warn)' : 'var(--live)'
   const statusLabel = isCancelled ? 'CANCELLED' : isDelayed ? 'DELAYED' : 'ON TIME'
   const countdownText = mins === null ? null : mins <= 0 ? 'boarding now' : `in ${mins} min`
+
+  if (cardStyle === 'minimal') {
+    return (
+      <button
+        className={`dep-row${isSoon ? ' is-soon' : ''}`}
+        onClick={() => setExpanded((x) => !x)}
+      >
+        <span className="dep-row-time" style={isCancelled ? { opacity: 0.35, textDecoration: 'line-through' } : undefined}>
+          {scheduled}
+        </span>
+        <span className="dep-row-mins">
+          {mins !== null ? (mins <= 0 ? 'now' : `${mins}m`) : ''}
+        </span>
+        <span className="dep-row-dest">to Moorgate</span>
+        {train.platform && <span className="dep-row-plat">P{train.platform}</span>}
+        <span className="dep-row-status" style={{ color: statusColor }}>{statusLabel}</span>
+      </button>
+    )
+  }
 
   return (
     <div className={`dep${isSoon ? ' is-soon' : ''}${expanded ? ' is-expanded' : ''}${isTracked ? ' is-tracked' : ''}`}>

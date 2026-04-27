@@ -36,15 +36,15 @@ function PinIcon({ size = 14 }) {
   )
 }
 
-export default function Header({ currentMode, setMode, isLoading, fetchTrains, lastUpdate, notificationsGranted, requestNotifications }) {
+export default function Header({ currentMode, setMode, isLoading, fetchTrains, lastUpdate, notificationsGranted, requestNotifications, headerStyle = 'compact' }) {
   const isOut = currentMode === 'out'
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
   const updateText = lastUpdate
     ? lastUpdate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—'
 
-  return (
-    <div className="hdr-compact">
+  const inner = (
+    <>
       <div className="hdr-row">
         <div>
           <div className="hdr-eyebrow">PG ROUTES · LIVE</div>
@@ -74,7 +74,7 @@ export default function Header({ currentMode, setMode, isLoading, fetchTrains, l
         </button>
       </div>
 
-      <div className="hdr-meta">
+      <div className={`hdr-meta${headerStyle === 'card' ? '' : ''}`}>
         <span className="live-dot" />
         <span className="live-text">Live · National Rail</span>
         <span className="dotsep">·</span>
@@ -87,6 +87,11 @@ export default function Header({ currentMode, setMode, isLoading, fetchTrains, l
           </span>
         )}
       </div>
-    </div>
+    </>
   )
+
+  if (headerStyle === 'card') {
+    return <div className="hdr-card">{inner}</div>
+  }
+  return <div className="hdr-compact">{inner}</div>
 }

@@ -10,7 +10,7 @@ function PinIcon({ size = 12, color = 'currentColor' }) {
   )
 }
 
-export default function HomeOptions({ routeOptions, isLoading, userLocation }) {
+export default function HomeOptions({ routeOptions, isLoading, userLocation, routeStyle = 'ribbon' }) {
   const preferred = routeOptions?.[0] ?? null
   const others = routeOptions?.slice(1) ?? []
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
@@ -71,9 +71,9 @@ export default function HomeOptions({ routeOptions, isLoading, userLocation }) {
             <span className="section-meta">{routeOptions.length} option{routeOptions.length !== 1 ? 's' : ''} · live</span>
           </div>
           <div className="rt-list">
-            <RouteOptionCard option={preferred} isPreferred />
+            <RouteOptionCard option={preferred} isPreferred routeStyle={routeStyle} />
             {others.map((option) => (
-              <RouteOptionCard key={option.id} option={option} />
+              <RouteOptionCard key={option.id} option={option} routeStyle={routeStyle} />
             ))}
           </div>
         </div>

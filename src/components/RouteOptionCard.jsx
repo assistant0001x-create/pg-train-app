@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HOME_COORDS, HOME_ADDRESS } from '../constants/stations'
+import { HOME_ADDRESS } from '../constants/stations'
 
 function minsFromNow(timeStr) {
   if (!timeStr || timeStr === 'On time' || timeStr === 'Delayed') return null
@@ -134,9 +134,13 @@ function buildLegs(option) {
   }
 }
 
+function legColor(leg) {
+  return leg.lineName ? (LINE_LC[leg.lineName] || MODE_LC[leg.mode] || 'var(--fg-3)')
+                      : (MODE_LC[leg.mode] || 'var(--fg-3)')
+}
+
 function RibbonLeg({ leg }) {
-  const lc = leg.lineName ? (LINE_LC[leg.lineName] || MODE_LC[leg.mode] || 'var(--fg-3)')
-                           : (MODE_LC[leg.mode] || 'var(--fg-3)')
+  const lc = legColor(leg)
   return (
     <div className="rt-r-leg" style={{ '--lc': lc }}>
       <div className="rt-r-icon"><ModeIconSvg mode={leg.mode} size={13} color={lc} /></div>
@@ -149,7 +153,95 @@ function RibbonLeg({ leg }) {
   )
 }
 
-export default function RouteOptionCard({ option, isPreferred }) {
+function RouteRibbon({ legs }) {
+  return (
+    <div className="rt-ribbon">
+      {legs.map((leg, i) => <RibbonLeg key={i} leg={leg} />)}
+    </div>
+  )
+}
+
+function RouteBars({ legs, total }) {
+  const totalMins = total || legs.reduce((s, l) => s + (l.durMin || 0), 0) || 1
+  return (
+    <div className="rt-bars">
+      <div className="rt-bars-track">
+        {legs.map((leg, i) => {
+          const c = legColor(leg)
+          const pct = ((leg.durMin || 0) / totalMins) * 100
+          return (
+            <div key={i} className="rt-bar-seg" style={{ width: `${Math.max(pct, 8)}%`, background: c, flex: pct < 8 ? '0 0 auto' : undefined }}>
+              <span className="rt-bar-glyph"><ModeIconSvg mode={leg.mode} size={11} color="oklch(15% 0.02 250)" /></span>
+              {pct > 14 && <span className="rt-bar-min">{leg.durMin}m</span>}
+            </div>
+          )
+        })}
+      </div>
+      <div className="rt-bars-legend">
+        {legs.map((leg, i) => (
+          <span key={i} className="rt-bars-l-item">
+            <span className="rt-bars-l-sw" style={{ background: legColor(leg) }} />
+            {leg.label.toLowerCase()}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function clockAdd(baseMins) {
+  const d = new Date(Date.now() + baseMins * 60000)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function RouteTimeline({ legs, leaveIn }) {
+  const departIn = leaveIn ?? 0
+  let runTime = 0
+  return (
+    <div className="rt-tl">
+      {legs.map((leg, i) => {
+        const c = legColor(leg)
+        const startMin = runTime
+        runTime += leg.durMin ?? 0
+        const startClock = clockAdd(startMin + departIn)
+        const endClock = clockAdd(runTime + departIn)
+        return (
+          <div key={i} className="rt-tl-leg">
+            <div className="rt-tl-rail">
+              <div className="rt-tl-pin" style={{ background: c, color: c }} />
+              <div className="rt-tl-line" style={{
+                background: leg.mode === 'walk'
+                  ? `repeating-linear-gradient(to bottom, ${c} 0 3px, transparent 3px 7px)`
+                  : c
+              }} />
+            </div>
+            <div className="rt-tl-body">
+              <div className="rt-tl-head">
+                <span className="rt-tl-icon" style={{ background: `color-mix(in oklch, ${c} 18%, transparent)`, color: c }}>
+                  <ModeIconSvg mode={leg.mode} size={13} color={c} />
+                </span>
+                <span className="rt-tl-label" style={{ color: c }}>{leg.label}</span>
+                <span className="rt-tl-dur">{leg.durMin != null ? `${leg.durMin} min` : '—'}</span>
+              </div>
+              <div className="rt-tl-clock">{startClock} – {endClock}</div>
+            </div>
+          </div>
+        )
+      })}
+      <div className="rt-tl-leg rt-tl-leg--end">
+        <div className="rt-tl-rail">
+          <div className="rt-tl-pin rt-tl-pin--end" />
+        </div>
+        <div className="rt-tl-body">
+          <div className="rt-tl-end-label">Arrive home</div>
+          <div className="rt-tl-clock">{clockAdd(runTime + departIn)}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function RouteOptionCard({ option, isPreferred, routeStyle = 'ribbon' }) {
   const [expanded, setExpanded] = useState(false)
   const { walkMins, journeyMins, departures, serviceNote, reliableDuration } = option
 
@@ -190,24 +282,24 @@ export default function RouteOptionCard({ option, isPreferred }) {
       </button>
 
       <div className="rt-body">
-        <div className="rt-ribbon">
-          {legs.map((leg, i) => (
-            <RibbonLeg key={i} leg={leg} />
-          ))}
-        </div>
+        {routeStyle === 'ribbon'   && <RouteRibbon legs={legs} />}
+        {routeStyle === 'bars'     && <RouteBars legs={legs} total={total} />}
+        {routeStyle === 'timeline' && <RouteTimeline legs={legs} leaveIn={leaveIn} />}
       </div>
 
       {expanded && (
         <div className="rt-expand">
-          {serviceNote && (
-            <div className="note-banner">{serviceNote}</div>
+          {routeStyle !== 'timeline' && (
+            <RouteTimeline legs={legs} leaveIn={leaveIn} />
           )}
+
+          {serviceNote && <div className="note-banner">{serviceNote}</div>}
           {departures.length === 0 && !serviceNote && (
-            <div className="note-banner">No live departures available — check TfL or National Rail.</div>
+            <div className="note-banner">No live departures — check TfL or National Rail.</div>
           )}
           {departures.length > 0 && (
             <>
-              <div className="rt-expand-label">Departures</div>
+              <div className="rt-expand-label" style={{ marginTop: routeStyle !== 'timeline' ? 12 : 0 }}>Departures</div>
               {departures.slice(0, 6).map((dep, i) => {
                 const t = effectiveTime(dep)
                 const mins = t ? minsFromNow(t) : null
@@ -216,12 +308,8 @@ export default function RouteOptionCard({ option, isPreferred }) {
                   <div key={dep.serviceID || i} className="rt-dep-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className={`rt-dep-time${dep.isCancelled ? ' rt-dep-time--cancelled' : ''}`}>{dep.std}</span>
-                      {isDelayed && (
-                        <span className="rt-dep-badge rt-dep-badge--delayed">exp {dep.etd}</span>
-                      )}
-                      {dep.isCancelled && (
-                        <span className="rt-dep-badge rt-dep-badge--cancel">Cancelled</span>
-                      )}
+                      {isDelayed && <span className="rt-dep-badge rt-dep-badge--delayed">exp {dep.etd}</span>}
+                      {dep.isCancelled && <span className="rt-dep-badge rt-dep-badge--cancel">Cancelled</span>}
                     </div>
                     <span className="rt-dep-mins" style={{ color: dep.isCancelled ? 'var(--fg-4)' : isDelayed ? 'var(--warn)' : 'var(--live)' }}>
                       {dep.isCancelled ? '—' : mins !== null ? `${mins} min` : 'Due'}
