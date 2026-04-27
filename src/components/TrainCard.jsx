@@ -1,64 +1,103 @@
-export default function TrainCard({ train, index, trackedServiceID, onTrack }) {
-  const scheduled = train.std || train.sta
+import { useState } from 'react'
+
+function minsFromNow(timeStr) {
+  if (!timeStr || timeStr === 'On time' || timeStr === 'Delayed') return null
+  const [h, m] = timeStr.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  const now = new Date()
+  const dep = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)
+  if (dep < now) dep.setDate(dep.getDate() + 1)
+  const mins = Math.round((dep - now) / 60000)
+  return mins < 0 || mins > 300 ? null : mins
+}
+
+function ChevDownIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6"/>
+    </svg>
+  )
+}
+
+export default function TrainCard({ train, trackedServiceID, onTrack }) {
+  const [expanded, setExpanded] = useState(false)
+  const scheduled = train.std || train.sta || 'TBC'
   const expected = train.etd || train.eta
   const isCancelled = train.isCancelled
   const isDelayed = !isCancelled && expected && expected !== scheduled && expected !== 'On time'
   const serviceId = train.serviceID || train.serviceId || ''
   const isTracked = serviceId && serviceId === trackedServiceID
 
-  let statusLabel = 'On time'
-  let statusClass = 'text-emerald-500'
+  const effectiveTime = isDelayed ? expected : scheduled
+  const mins = minsFromNow(effectiveTime)
+  const isSoon = mins !== null && mins <= 5
 
-  if (isCancelled) {
-    statusLabel = 'Cancelled'
-    statusClass = 'text-red-500'
-  } else if (isDelayed) {
-    statusLabel = 'Delayed'
-    statusClass = 'text-amber-500'
-  }
+  const statusColor = isCancelled ? 'var(--danger)' : isDelayed ? 'var(--warn)' : 'var(--live)'
+  const statusLabel = isCancelled ? 'CANCELLED' : isDelayed ? 'DELAYED' : 'ON TIME'
+  const countdownText = mins === null ? null : mins <= 0 ? 'boarding now' : `in ${mins} min`
 
   return (
-    <div
-      onClick={() => onTrack(serviceId)}
-      className={`bg-white rounded-2xl cursor-pointer px-4 py-4 shadow-lg hover:shadow-xl transition-shadow ${
-        isTracked ? 'ring-2 ring-amber-400' : ''
-      }`}
-      style={{ animationDelay: `${index * 0.05}s` }}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <div className={`text-3xl font-bold leading-none ${isCancelled ? 'text-slate-300 line-through' : 'text-slate-900'}`}>
-            {scheduled || 'TBC'}
-          </div>
-          {isDelayed && (
-            <div className="text-xs text-amber-500 font-semibold mt-1">Expected {expected}</div>
-          )}
+    <div className={`dep${isSoon ? ' is-soon' : ''}${expanded ? ' is-expanded' : ''}${isTracked ? ' is-tracked' : ''}`}>
+      <button
+        className="dep-main"
+        onClick={() => setExpanded(x => !x)}
+        aria-expanded={expanded}
+      >
+        <div className="dep-time-col">
+          <div className={`dep-time${isCancelled ? ' dep-time--cancelled' : ''}`}>{scheduled}</div>
+          {countdownText && <div className="dep-countdown">{countdownText}</div>}
+          {isDelayed && <div className="dep-expected">exp {expected}</div>}
         </div>
 
-        <div className="text-right">
-          <span className={`text-xs font-bold tracking-wide uppercase ${statusClass}`}>
+        <div className="dep-mid">
+          <div className="dep-dest">to Moorgate</div>
+          <div className="dep-meta-row">
+            {train.platform && (
+              <span className="dep-chip">
+                <span className="chip-k">PLAT</span>
+                <span className="chip-v">{train.platform}</span>
+              </span>
+            )}
+            {train.operator && (
+              <span className="dep-chip dep-chip--op">{train.operator}</span>
+            )}
+            {isTracked && (
+              <span className="dep-chip dep-chip--tracked">TRACKING</span>
+            )}
+          </div>
+        </div>
+
+        <div className="dep-right">
+          <span className="dep-status" style={{ color: statusColor, borderColor: statusColor }}>
+            <span className="dep-status-dot" style={{ background: statusColor }} />
             {statusLabel}
           </span>
-          {isTracked && (
-            <div className="mt-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 text-[10px] font-semibold text-amber-700 border border-amber-200">
-                Tracking
-              </span>
+          <span className={`dep-chev${expanded ? ' is-open' : ''}`}>
+            <ChevDownIcon />
+          </span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="dep-expand">
+          <div className="dep-expand-label">Details</div>
+          <div className="dep-expand-detail">
+            {isDelayed && <>Expected departure: <strong style={{ color: 'var(--warn)' }}>{expected}</strong><br /></>}
+            {isCancelled && <span style={{ color: 'var(--danger)' }}>This service has been cancelled.<br /></span>}
+            {train.platform && <>Platform {train.platform} · </>}{train.operator || 'Great Northern'}
+          </div>
+          {serviceId && (
+            <div className="dep-expand-note">
+              <button
+                style={{ color: isTracked ? 'var(--warn)' : 'var(--accent)', fontFamily: 'inherit', cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); onTrack(serviceId) }}
+              >
+                {isTracked ? '↓ Stop tracking this train' : '↑ Track this train for delay alerts'}
+              </button>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-xs pt-3 border-t border-slate-100">
-        <div>
-          <span className="text-slate-400 font-medium">Platform</span>
-          <span className="ml-2 text-slate-700 font-semibold">{train.platform || '—'}</span>
-        </div>
-        <div className="text-right">
-          <span className="text-slate-400 font-medium">Operator</span>
-          <span className="ml-2 text-slate-700 font-semibold">{train.operator || '—'}</span>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

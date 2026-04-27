@@ -1,87 +1,91 @@
 import { HOME_ADDRESS } from '../constants/stations'
 
-export default function Header({
-  currentMode,
-  setMode,
-  isLoading,
-  fetchTrains,
-  lastUpdate,
-  notificationsGranted,
-  requestNotifications,
-  clearCacheAndReload,
-}) {
-  const homeLabel = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
-  const subtitle = currentMode === 'out'
-    ? 'Palmers Green → Moorgate'
-    : `Current location → ${homeLabel}`
+function RefreshIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/>
+      <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/>
+    </svg>
+  )
+}
+function BellIcon({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+      <path d="M10 21a2 2 0 0 0 4 0"/>
+    </svg>
+  )
+}
+function RailIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="14" rx="2"/>
+      <path d="M5 10h14"/>
+      <circle cx="9" cy="14" r="0.6" fill="currentColor" stroke="none"/>
+      <circle cx="15" cy="14" r="0.6" fill="currentColor" stroke="none"/>
+      <path d="M8 17l-2 4M16 17l2 4"/>
+    </svg>
+  )
+}
+function PinIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/>
+      <circle cx="12" cy="9" r="2.5"/>
+    </svg>
+  )
+}
+
+export default function Header({ currentMode, setMode, isLoading, fetchTrains, lastUpdate, notificationsGranted, requestNotifications }) {
+  const isOut = currentMode === 'out'
+  const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
+  const updateText = lastUpdate
+    ? lastUpdate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—'
 
   return (
-    <div className="bg-white rounded-3xl p-5 sm:p-6 mb-4 shadow-xl">
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="hdr-compact">
+      <div className="hdr-row">
         <div>
-          <p className="text-[10px] font-bold text-amber-500 tracking-widest uppercase">PG Routes</p>
-          <h1 className="text-2xl font-bold text-slate-900 leading-tight">Palmers Green</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>
+          <div className="hdr-eyebrow">PG ROUTES · LIVE</div>
+          <div className="hdr-title">Palmers Green</div>
+          <div className="hdr-sub">
+            {isOut
+              ? <>Palmers Green <span className="arr">→</span> Moorgate</>
+              : <>Current location <span className="arr">→</span> {homeLabel}</>}
+          </div>
         </div>
         <button
+          className={`hdr-icon-btn${isLoading ? ' is-spinning' : ''}`}
           onClick={() => fetchTrains({ force: true })}
-          className="p-3 rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-700 transition-colors shrink-0"
-          aria-label="Refresh routes"
+          aria-label="Refresh"
         >
-          <svg
-            className={`w-5 h-5 text-white ${isLoading ? 'animate-spin' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          <RefreshIcon />
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 bg-slate-100 rounded-xl p-1 mb-4">
-        {['out', 'home'].map((mode) => {
-          const active = currentMode === mode
-          return (
-            <button
-              key={mode}
-              onClick={() => setMode(mode)}
-              className={`rounded-lg py-2.5 text-sm font-bold tracking-wide transition-all ${
-                active
-                  ? 'bg-amber-400 text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {mode.toUpperCase()}
-            </button>
-          )
-        })}
+      <div className="seg" role="tablist">
+        <div className={`seg-thumb${isOut ? '' : ' seg-thumb--right'}`} />
+        <button className={`seg-btn${isOut ? ' is-active' : ''}`} onClick={() => setMode('out')} role="tab" aria-selected={isOut}>
+          <RailIcon /> OUT
+        </button>
+        <button className={`seg-btn${!isOut ? ' is-active' : ''}`} onClick={() => setMode('home')} role="tab" aria-selected={!isOut}>
+          <PinIcon /> HOME
+        </button>
       </div>
 
-      <div className="text-xs text-slate-400">
-        {lastUpdate ? `Updated ${lastUpdate.toLocaleTimeString('en-GB')}` : 'Loading…'}
-      </div>
-
-      <div className="flex items-center gap-4 flex-wrap pt-3 mt-3 border-t border-slate-100">
+      <div className="hdr-meta">
+        <span className="live-dot" />
+        <span className="live-text">Live · National Rail</span>
+        <span className="dotsep">·</span>
+        <span className="muted">Updated {updateText}</span>
         {!notificationsGranted && (
-          <button
-            onClick={requestNotifications}
-            className="text-xs text-amber-600 font-semibold hover:text-amber-700"
-          >
-            Enable alerts
-          </button>
+          <span className="hdr-actions">
+            <button className="link-btn" onClick={requestNotifications}>
+              <BellIcon /> Alerts
+            </button>
+          </span>
         )}
-        <button
-          onClick={clearCacheAndReload}
-          className="text-xs text-slate-400 font-semibold hover:text-slate-600"
-        >
-          Force update
-        </button>
       </div>
     </div>
   )

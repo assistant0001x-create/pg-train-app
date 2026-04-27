@@ -1,65 +1,111 @@
 import TrainCard from './TrainCard'
-import { HOME_ADDRESS } from '../constants/stations'
-import { buildMapsUrl } from '../utils/maps'
 
-export default function TrainList({ trains, isLoading, trackedServiceID, onTrack, currentMode, homeRoutingInfo }) {
+function minsFromNow(timeStr) {
+  if (!timeStr || timeStr === 'On time' || timeStr === 'Delayed') return null
+  const [h, m] = timeStr.split(':').map(Number)
+  if (isNaN(h) || isNaN(m)) return null
+  const now = new Date()
+  const dep = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m)
+  if (dep < now) dep.setDate(dep.getDate() + 1)
+  const mins = Math.round((dep - now) / 60000)
+  return mins < 0 || mins > 300 ? null : mins
+}
+
+function SpinIcon() {
+  return (
+    <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--fg-4)' }}>
+      <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/>
+      <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/>
+    </svg>
+  )
+}
+
+function NextUpHero({ train }) {
+  const scheduled = train.std || 'TBC'
+  const expected = train.etd || train.eta
+  const isDelayed = expected && expected !== scheduled && expected !== 'On time'
+  const isCancelled = train.isCancelled
+
+  const effectiveTime = isDelayed ? expected : scheduled
+  const mins = minsFromNow(effectiveTime)
+  const pct = mins === null ? 100 : Math.max(5, Math.min(100, ((15 - mins) / 15) * 100))
+
+  const minsDisplay = mins === null ? '—' : mins <= 0 ? 'NOW' : String(mins)
+  const showUnit = mins !== null && mins > 0
+
+  return (
+    <div className="next-up">
+      <div className="next-up-eyebrow">NEXT TRAIN</div>
+      <div className="next-up-row">
+        <div className="next-up-time" style={isCancelled ? { opacity: 0.3, textDecoration: 'line-through' } : undefined}>
+          {scheduled}
+        </div>
+        <div className="next-up-mid">
+          <div className="next-up-dest">to Moorgate</div>
+          <div className="next-up-meta">
+            {train.platform ? `Plat ${train.platform}` : ''}
+            {train.platform && train.operator ? ' · ' : ''}
+            {train.operator || 'Great Northern'}
+            {isCancelled && <span style={{ color: 'var(--danger)', marginLeft: 6 }}>CANCELLED</span>}
+            {isDelayed && !isCancelled && <span style={{ color: 'var(--warn)', marginLeft: 6 }}>exp {expected}</span>}
+          </div>
+        </div>
+        <div className="next-up-count">
+          <div className="next-up-mins" style={isCancelled ? { color: 'var(--danger)' } : undefined}>
+            {minsDisplay}
+          </div>
+          {showUnit && <div className="next-up-unit">min</div>}
+        </div>
+      </div>
+      <div className="next-up-bar">
+        <div className="next-up-bar-fill" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+export default function TrainList({ trains, isLoading, trackedServiceID, onTrack }) {
   if (isLoading && trains.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-10 text-center shadow-lg">
-        <div className="flex flex-col items-center gap-4">
-          <svg className="w-12 h-12 text-slate-300 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <p className="text-sm font-semibold text-slate-400">Loading train times…</p>
-        </div>
+      <div className="loading-state">
+        <SpinIcon />
+        <span className="loading-label">Loading train times…</span>
       </div>
     )
   }
 
   if (trains.length === 0) {
-    if (currentMode === 'home' && homeRoutingInfo?.location && HOME_ADDRESS) {
-      const homeMapsUrl = buildMapsUrl(homeRoutingInfo.location, HOME_ADDRESS, 'transit')
-      return (
-        <div className="bg-white rounded-2xl p-8 text-center shadow-lg">
-          <p className="text-sm font-medium text-slate-600 mb-2">No Great Northern trains right now.</p>
-          <a
-            href={homeMapsUrl}
-            target="_blank"
-            rel="noopener"
-            className="text-xs font-semibold text-amber-600 hover:text-amber-700 underline transition-colors"
-          >
-            Open transit directions in Maps
-          </a>
-        </div>
-      )
-    }
-
     return (
-      <div className="bg-white rounded-2xl p-10 text-center shadow-lg">
-        <div className="flex flex-col items-center gap-3">
-          <svg className="w-16 h-16 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold text-slate-400 mb-1">Ready to load train times</p>
-            <p className="text-xs text-slate-400">Tap the refresh button above</p>
-          </div>
-        </div>
+      <div className="empty-state">
+        No departures found. Tap refresh to try again.
       </div>
     )
   }
 
+  const [nextTrain, ...rest] = trains
+
   return (
-    <div className="space-y-3">
-      {trains.map((train, index) => (
-        <TrainCard
-          key={train.serviceID || train.serviceId || index}
-          train={train}
-          index={index}
-          trackedServiceID={trackedServiceID}
-          onTrack={onTrack}
-        />
-      ))}
+    <div>
+      <NextUpHero train={nextTrain} />
+
+      {rest.length > 0 && (
+        <>
+          <div className="section-head">
+            <span className="section-title">Following</span>
+            <span className="section-meta">{rest.length} more</span>
+          </div>
+          <div className="dep-list">
+            {rest.map((train) => (
+              <TrainCard
+                key={train.serviceID || train.serviceId || train.std}
+                train={train}
+                trackedServiceID={trackedServiceID}
+                onTrack={onTrack}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
