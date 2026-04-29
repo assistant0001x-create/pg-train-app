@@ -9,7 +9,6 @@ export const GREAT_NORTHERN_STATIONS = [
   { code: 'HPY', name: 'Hornsey', lat: 51.5875, lon: -0.1169 },
   { code: 'ALX', name: 'Alexandra Palace', lat: 51.5978, lon: -0.1197 },
   { code: 'BVP', name: 'Bowes Park', lat: 51.6021, lon: -0.1196 },
-  { code: 'ARN', name: 'Arnos Grove', lat: 51.6163, lon: -0.1334 },
   { code: 'WGC', name: 'Winchmore Hill', lat: 51.6341, lon: -0.1008 },
   { code: 'GAN', name: 'Grange Park', lat: 51.6414, lon: -0.1044 },
   { code: 'ENF', name: 'Enfield Chase', lat: 51.6527, lon: -0.1047 },

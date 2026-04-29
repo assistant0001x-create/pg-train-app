@@ -92,6 +92,7 @@ export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
 
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) throw new Error('RDG API key invalid or unauthorised.')
+    if (res.status === 400) throw new Error('No services found — station not recognised or no route available.')
     if (res.status === 429) throw new Error('Rate limit reached. Please wait a moment.')
     throw new Error(`RDG API error: ${res.status}`)
   }

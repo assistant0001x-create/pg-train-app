@@ -281,7 +281,14 @@ export function useTrainApp() {
           : null
 
         // ── 1. GN Train only ─────────────────────────────────────────────────
-        const services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
+        let services = []
+        let gnFetchError = null
+        try {
+          services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
+        } catch (gnErr) {
+          gnFetchError = gnErr.message
+          console.warn('[PG Train] GN API error for', station.code, ':', gnErr.message)
+        }
         const trainOption = {
           id: `train-${station.code}`,
           type: 'train',
@@ -298,6 +305,7 @@ export function useTrainApp() {
             walkMins: effectiveTrainWalkMins,
             stationName: station.name,
           } : null,
+          ...(gnFetchError ? { serviceNote: 'Live train data unavailable — check National Rail app.' } : {}),
         }
 
         // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
@@ -426,7 +434,11 @@ export function useTrainApp() {
         setRouteOptions(displayOptions)
         setTrains(services.slice(0, 12))
         setLastUpdate(new Date())
-        showStatus('success', 'Connected. Showing live departures.')
+        if (gnFetchError) {
+          showStatus('warning', 'Live GN data unavailable — showing alternative routes. Check National Rail app.')
+        } else {
+          showStatus('success', 'Connected. Showing live departures.')
+        }
         return
       }
 
