@@ -1,5 +1,5 @@
-import RouteOptionCard from './RouteOptionCard'
-import { HOME_ADDRESS } from '../constants/stations'
+import JourneyCard from './JourneyCard'
+import { HOME_ADDRESS, PALMERS_GREEN } from '../constants/stations'
 
 function PinIcon({ size = 12, color = 'currentColor' }) {
   return (
@@ -10,14 +10,12 @@ function PinIcon({ size = 12, color = 'currentColor' }) {
   )
 }
 
-export default function HomeOptions({ routeOptions, isLoading, userLocation, routeStyle = 'ribbon', mockLocation }) {
-  const preferred = routeOptions?.[0] ?? null
-  const preferredIsGN = preferred?.isPreferredGN ?? false
-  const multimodal = preferredIsGN ? (routeOptions?.[1] ?? null) : null
-  const fallbackOptions = !preferredIsGN ? (routeOptions ?? []) : []
-  const homeLabel = HOME_ADDRESS || '73 Hazelwood Ln'
+export default function HomeOptions({ routeOptions, isLoading, userLocation, mockLocation }) {
+  const toHome = routeOptions?.find((r) => r.id === 'to-home') ?? null
+  const toStation = routeOptions?.find((r) => r.id === 'to-station') ?? null
+  const homeLabel = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
 
-  if (isLoading && !preferred) {
+  if (isLoading && !toHome && !toStation) {
     return (
       <div>
         <div className="from-row">
@@ -73,45 +71,31 @@ export default function HomeOptions({ routeOptions, isLoading, userLocation, rou
         </div>
       )}
 
-      {preferred && preferredIsGN && (
+      {toHome && (
         <div>
           <div className="section-head">
-            <span className="section-title">Best route home</span>
-            <span className="section-meta">Great Northern · live</span>
+            <span className="section-title">Quickest route home</span>
+            <span className="section-meta">All TfL modes</span>
           </div>
           <div className="rt-list">
-            <RouteOptionCard option={preferred} isPreferred defaultExpanded routeStyle={routeStyle} />
-          </div>
-
-          {multimodal && (
-            <>
-              <div className="section-head" style={{ marginTop: 16 }}>
-                <span className="section-title">Alternative</span>
-                <span className="section-meta">1 option</span>
-              </div>
-              <div className="rt-list">
-                <RouteOptionCard key={multimodal.id} option={multimodal} routeStyle={routeStyle} />
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {preferred && !preferredIsGN && (
-        <div>
-          <div className="section-head">
-            <span className="section-title">Routes home</span>
-            <span className="section-meta">{fallbackOptions.length} option{fallbackOptions.length !== 1 ? 's' : ''} · live</span>
-          </div>
-          <div className="rt-list">
-            {fallbackOptions.map((option) => (
-              <RouteOptionCard key={option.id} option={option} routeStyle={routeStyle} />
-            ))}
+            <JourneyCard journey={toHome} defaultExpanded />
           </div>
         </div>
       )}
 
-      {!preferred && !isLoading && (
+      {toStation && (
+        <div>
+          <div className="section-head" style={{ marginTop: 16 }}>
+            <span className="section-title">Quickest to {PALMERS_GREEN.name} station</span>
+            <span className="section-meta">TfL live</span>
+          </div>
+          <div className="rt-list">
+            <JourneyCard journey={toStation} />
+          </div>
+        </div>
+      )}
+
+      {!toHome && !toStation && !isLoading && (
         <div className="empty-state">No route options found. Tap refresh to try again.</div>
       )}
     </div>

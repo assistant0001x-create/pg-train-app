@@ -17,9 +17,13 @@ export const GREAT_NORTHERN_STATIONS = [
   { code: 'CHN', name: 'Cuffley', lat: 51.7086, lon: -0.1021 },
 ]
 
-export const PALMERS_GREEN = { code: 'PAL', name: 'Palmers Green', lat: 51.6176, lon: -0.1116 }
+// Coords + NaPTAN id verified against TfL StopPoint search 2026-07-19 (was off by ~70m)
+export const PALMERS_GREEN = { code: 'PAL', name: 'Palmers Green', lat: 51.618314, lon: -0.110437, naptanId: '910GPALMRSG' }
 export const MOORGATE = { code: 'MOG', name: 'Moorgate' }
-export const HOME_COORDS = { lat: 51.6183, lon: -0.1025 }
+
+// N13 5HE centroid via postcodes.io 2026-07-19 — previous hardcoded value was ~70m off
+export const HOME_COORDS = { lat: 51.617784, lon: -0.102027 }
+export const HOME_POSTCODE = 'N13 5HE'
 
 // Piccadilly stations nearest home — used as alight-here targets in HOME mode
 // Shows eastbound arrivals (trains coming from central London toward Cockfosters)

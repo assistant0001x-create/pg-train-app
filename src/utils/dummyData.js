@@ -1,118 +1,41 @@
-// Dummy data for offline testing — simulates live departure boards
+// Dummy data for offline testing — simulates TfL Journey Planner responses
 // Toggle off by setting VITE_DUMMY_MODE=false in your .env
 
 function pad(n) {
   return n.toString().padStart(2, '0')
 }
 
-function fmtTime(date) {
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+function clockAt(mins) {
+  const d = new Date(Date.now() + mins * 60000)
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function addMins(date, mins) {
-  return new Date(date.getTime() + mins * 60000)
-}
-
-export function generateTrainDepartures({
-  offsetMins = 4,
-  intervalMins = 15,
-  count = 8,
-  hasDelay = false,
-  cancelIndex = -1,
-} = {}) {
-  const now = new Date()
-  return Array.from({ length: count }, (_, i) => {
-    const dep = addMins(now, offsetMins + i * intervalMins)
-    const std = fmtTime(dep)
-    const isCancelled = cancelIndex === i
-    const isDelayed = hasDelay && i === 1
-    const etd = isCancelled ? 'Cancelled' : isDelayed ? fmtTime(addMins(dep, 5)) : 'On time'
-    return {
-      std,
-      etd,
-      isCancelled,
-      platform: '1',
-      operator: 'Great Northern',
-      serviceID: `DUMMY-GN-${offsetMins}-${i}`,
-      serviceId: `DUMMY-GN-${offsetMins}-${i}`,
-    }
-  })
-}
-
-export function generateTubeDepartures({
-  offsetMins = 3,
-  intervalMins = 7,
-  count = 8,
-} = {}) {
-  const now = new Date()
-  return Array.from({ length: count }, (_, i) => {
-    const dep = addMins(now, offsetMins + i * intervalMins)
-    return {
-      std: fmtTime(dep),
-      etd: 'On time',
-      isCancelled: false,
-      platform: '2',
-      operator: 'TfL',
-      serviceID: `DUMMY-TFL-${offsetMins}-${i}`,
-      serviceId: `DUMMY-TFL-${offsetMins}-${i}`,
-    }
-  })
-}
-
-// Simulates being near Palmers Green — shows realistic nearby options
-export function getDummyRouteOptions() {
-  return [
-    {
-      id: 'train-BVP',
-      type: 'train',
-      station: { code: 'BVP', name: 'Bowes Park' },
-      walkMins: 7,
-      journeyMins: 4, // Bowes Park → Palmers Green (1 stop)
-      destination: 'Palmers Green',
-      line: 'Great Northern',
-      operator: 'Great Northern',
-      mapsUrl: null,
-      departures: generateTrainDepartures({ offsetMins: 4, intervalMins: 15 }),
-      reliableDuration: true,
+// Two journeys matching the shape fetchJourneys() returns: one door-to-door
+// to home, one ending at Palmers Green station.
+export function getDummyJourneys() {
+  return {
+    toHome: {
+      id: 'to-home',
+      durationMin: 34,
+      depClock: clockAt(0),
+      arrClock: clockAt(34),
+      legs: [
+        { mode: 'walking', durMin: 6, label: 'Walk to Wood Green', lineName: null, to: 'Wood Green', depClock: clockAt(0), arrClock: clockAt(6) },
+        { mode: 'tube', durMin: 14, label: 'Piccadilly line to Bounds Green', lineName: 'Piccadilly', to: 'Bounds Green', depClock: clockAt(8), arrClock: clockAt(22) },
+        { mode: 'bus', durMin: 9, label: 'Bus 184 to Hazelwood Lane', lineName: null, to: 'Hazelwood Lane', depClock: clockAt(24), arrClock: clockAt(33) },
+        { mode: 'walking', durMin: 1, label: 'Walk to 73 Hazelwood Lane', lineName: null, to: '73 Hazelwood Lane', depClock: clockAt(33), arrClock: clockAt(34) },
+      ],
     },
-    {
-      id: 'tube-BGN',
-      type: 'tube',
-      station: { name: 'Bounds Green', line: 'Piccadilly' },
-      walkMins: null,
-      journeyMins: 12, // walk from Bounds Green to Palmers Green
-      destination: 'Palmers Green',
-      line: 'Piccadilly',
-      operator: 'TfL',
-      mapsUrl: null,
-      departures: generateTubeDepartures({ offsetMins: 3, intervalMins: 7 }),
-      reliableDuration: false,
+    toStation: {
+      id: 'to-station',
+      durationMin: 22,
+      depClock: clockAt(0),
+      arrClock: clockAt(22),
+      legs: [
+        { mode: 'walking', durMin: 7, label: 'Walk to Bowes Park', lineName: null, to: 'Bowes Park', depClock: clockAt(0), arrClock: clockAt(7) },
+        { mode: 'national-rail', durMin: 4, label: 'Great Northern to Palmers Green', lineName: 'Great Northern', to: 'Palmers Green', depClock: clockAt(11), arrClock: clockAt(15) },
+        { mode: 'walking', durMin: 1, label: 'Walk to platform', lineName: null, to: 'Palmers Green', depClock: clockAt(15), arrClock: clockAt(16) },
+      ],
     },
-    {
-      id: 'train-ALX',
-      type: 'train',
-      station: { code: 'ALX', name: 'Alexandra Palace' },
-      walkMins: 14,
-      journeyMins: 6, // Alexandra Palace → Palmers Green (2 stops)
-      destination: 'Palmers Green',
-      line: 'Great Northern',
-      operator: 'Great Northern',
-      mapsUrl: null,
-      departures: generateTrainDepartures({ offsetMins: 8, intervalMins: 15, hasDelay: true }),
-      reliableDuration: true,
-    },
-    {
-      id: 'tube-ARN',
-      type: 'tube',
-      station: { name: 'Arnos Grove', line: 'Piccadilly' },
-      walkMins: null,
-      journeyMins: 18, // walk from Arnos Grove to Palmers Green
-      destination: 'Palmers Green',
-      line: 'Piccadilly',
-      operator: 'TfL',
-      mapsUrl: null,
-      departures: generateTubeDepartures({ offsetMins: 5, intervalMins: 7 }),
-      reliableDuration: false,
-    },
-  ]
+  }
 }

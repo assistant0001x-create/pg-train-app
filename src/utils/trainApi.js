@@ -72,6 +72,48 @@ export async function fetchFirstLegMinutes(fromLat, fromLon, toLat, toLon) {
   }
 }
 
+// All TfL-planned modes except taxi/cab
+const JOURNEY_MODES = 'tube,bus,national-rail,overground,elizabeth-line,dlr,tram,walking,cycle,river-bus,coach'
+
+function fmtClock(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function parseLeg(leg) {
+  return {
+    mode: leg.mode?.id || 'walking',
+    durMin: leg.duration ?? null,
+    label: leg.instruction?.summary || leg.mode?.name || 'Leg',
+    lineName: leg.routeOptions?.[0]?.name || null,
+    to: leg.arrivalPoint?.commonName || null,
+    depClock: fmtClock(leg.departureTime),
+    arrClock: fmtClock(leg.arrivalTime),
+  }
+}
+
+// Quickest TfL Journey Planner route from GPS coords to a destination
+// (postcode, place name, or "lat,lon" / NaPTAN id string).
+export async function fetchJourneys(fromLat, fromLon, to) {
+  const params = new URLSearchParams({ mode: JOURNEY_MODES })
+  if (TFL_KEY) params.set('app_key', TFL_KEY)
+  const res = await fetch(
+    `${TFL_BASE}/Journey/JourneyResults/${fromLat},${fromLon}/to/${encodeURIComponent(to)}?${params}`
+  )
+  if (!res.ok) throw new Error(`TfL Journey Planner error: ${res.status}`)
+  const data = await res.json()
+  const journeys = data.journeys || []
+  if (journeys.length === 0) return null
+  const quickest = journeys.reduce((a, b) => (b.duration < a.duration ? b : a))
+  return {
+    durationMin: quickest.duration,
+    depClock: fmtClock(quickest.startDateTime),
+    arrClock: fmtClock(quickest.arrivalDateTime),
+    legs: (quickest.legs || []).map(parseLeg),
+  }
+}
+
 export async function fetchDepartures(fromCrs, toCrs, { force = false } = {}) {
   if (!API_KEY) throw new Error('RDG API key not configured.')
 

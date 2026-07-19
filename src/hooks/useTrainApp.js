@@ -1,39 +1,21 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  GREAT_NORTHERN_STATIONS,
   PALMERS_GREEN,
   MOORGATE,
   HOME_COORDS,
-  TUBE_STATIONS,
-  TUBE_TRAIN_INTERCHANGE,
+  HOME_POSTCODE,
   HOME_ADDRESS,
-  MAX_WALK_MINUTES,
   DEPARTURE_NOTIFY_MINUTES,
-  OVERGROUND_STATIONS,
 } from '../constants/stations'
-import { calculateDistance, getNearestLocation, walkingMinutes } from '../utils/distance'
-import { buildMapsUrl } from '../utils/maps'
-import { fetchDepartures, fetchTubeArrivals, fetchOvergroundArrivals, fetchFirstLegMinutes } from '../utils/trainApi'
-import { getDummyRouteOptions } from '../utils/dummyData'
+import { walkingMinutes } from '../utils/distance'
+import { fetchDepartures, fetchJourneys } from '../utils/trainApi'
+import { getDummyJourneys } from '../utils/dummyData'
 
 // Set VITE_DUMMY_MODE=false in .env to use the live API
 const DUMMY_MODE = import.meta.env.VITE_DUMMY_MODE !== 'false'
 
 // Default home destination shown across HOME mode routes
 const HOME_DESTINATION = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
-
-// Approximate GN journey times (minutes) from each station to Palmers Green
-const JOURNEY_MINS_TO_PAL = {
-  MOG: 30, OLD: 27, EXR: 24, HBY: 21, DRN: 18,
-  FPK: 15, HRY: 12, HPY: 9,  ALX: 6,  BVP: 4,
-  WGC: 4,  GAN: 6,  ENF: 9,  GNT: 12, CWN: 15, CHN: 18,
-}
-
-// Builds a TfL Journey Planner deep link from the user's current GPS to a boarding station.
-// Hands off to TfL rather than calculating the first leg ourselves.
-function buildTflJourneyUrl(fromLat, fromLon, toLat, toLon, toName) {
-  return `https://tfl.gov.uk/plan-a-journey/?fromName=Current+Location&from=${fromLat},${fromLon}&toName=${encodeURIComponent(toName)}&to=${toLat},${toLon}`
-}
 
 function getServiceStatus(service) {
   if (service.isCancelled) return 'cancelled'
@@ -59,31 +41,6 @@ function getTrackedDepartureTime(service) {
     return parseDepartureTime(service.etd || service.eta) || parseDepartureTime(service.std || service.sta)
   }
   return parseDepartureTime(service.std || service.sta)
-}
-
-function getOptionSortMinutes(option) {
-  const baseJourney = option.journeyMins ?? 0
-  const walk = option.walkMins ?? 0
-  if (!option.departures || option.departures.length === 0) return Number.POSITIVE_INFINITY
-
-  const nextMins = option.departures
-    .filter((d) => !d.isCancelled)
-    .map((d) => {
-      const t = d.etd && d.etd !== 'On time' ? d.etd : d.std
-      const dep = parseDepartureTime(t)
-      if (!dep) return null
-      const mins = Math.round((dep.getTime() - Date.now()) / 60000)
-      if (mins < 0 || mins > 300) return null
-      return mins
-    })
-    .filter((m) => m !== null)
-
-  if (nextMins.length === 0) return Number.POSITIVE_INFINITY
-
-  const catchable = nextMins.find((m) => m >= walk)
-  if (catchable == null) return Number.POSITIVE_INFINITY
-
-  return catchable + baseJourney
 }
 
 function sendNotification(title, body) {
@@ -189,30 +146,20 @@ export function useTrainApp() {
         setRouteOptions([])
       } else if (DUMMY_MODE) {
         // Offline demo — no API calls
-        setRouteOptions(getDummyRouteOptions())
+        const { toHome, toStation } = getDummyJourneys()
+        setRouteOptions([toHome, toStation])
         setTrains([])
         setLastUpdate(new Date())
         showStatus('info', 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
         return
       } else {
         // ── LIVE HOME mode ────────────────────────────────────────────────────
-        // All options route the traveller TO Palmers Green / 73 Hazelwood Lane.
-        //
-        // Option categories:
-        //   1. Train only       — nearest GN station → GN train → Palmers Green
-        //   2. Tube + Train     — Piccadilly → Finsbury Park → GN → Palmers Green
-        //   3. Tube only        — Piccadilly → Arnos Grove / Bounds Green / Wood Green
-        //                          (eastbound arrivals shown at near-home station)
-        //   4. Overground       — Silver Street (for users coming from east London)
-        //   5. Bus              — when walking leg > 15 min in any option
+        // Two TfL Journey Planner routes, both from current GPS:
+        //   1. Quickest multi-modal route all the way to N13 5HE (any TfL mode, no cab)
+        //   2. Quickest route ending at Palmers Green station
         // ─────────────────────────────────────────────────────────────────────
 
-        let station = GREAT_NORTHERN_STATIONS.find((s) => s.code === 'FPK') || GREAT_NORTHERN_STATIONS[0]
         let location = null
-        let trainWalkMins = null
-        let effectiveTrainWalkMins = null
-        let trainMapsUrl = null
-
         setLocationLabel(null)
 
         try {
@@ -221,223 +168,74 @@ export function useTrainApp() {
           reverseGeocode(location.lat, location.lon).then((label) => {
             if (label && mountedRef.current) setLocationLabel(label)
           })
-          const nearest = getNearestLocation(location, GREAT_NORTHERN_STATIONS)
-          if (nearest) station = nearest
-          trainWalkMins = walkingMinutes(location.lat, location.lon, station.lat, station.lon)
-          effectiveTrainWalkMins = trainWalkMins
-          if (trainWalkMins > MAX_WALK_MINUTES) {
-            const realMins = await fetchFirstLegMinutes(location.lat, location.lon, station.lat, station.lon)
-            if (realMins != null) effectiveTrainWalkMins = realMins
-          }
-          const travelMode = trainWalkMins <= MAX_WALK_MINUTES ? 'walking' : 'transit'
-          trainMapsUrl = buildMapsUrl(location, `${station.lat},${station.lon}`, travelMode)
-          setWalkingInfo({ trainWalkMins, station, mapsUrl: trainMapsUrl, travelMode, locationError: false })
         } catch (locErr) {
-          trainMapsUrl = buildMapsUrl(null, `${station.lat},${station.lon}`, 'walking')
-          setWalkingInfo({ trainWalkMins: null, station, mapsUrl: trainMapsUrl, travelMode: 'walking', locationError: true })
           console.warn('Could not get user location:', locErr)
         }
 
-        setHomeRoutingInfo({ location, nearestTrain: station, trainWalkMins })
+        setHomeRoutingInfo({ location })
+
+        if (!location) {
+          setRouteOptions([])
+          setTrains([])
+          setLastUpdate(new Date())
+          showStatus('error', 'Could not get your location. Enable location access and try again.')
+          return
+        }
 
         // Citymapper-like sanity rule: if you're already very close to home,
-        // prefer walk-only and suppress long public transport options.
-        if (location) {
-          const walkToHome = Math.round(walkingMinutes(location.lat, location.lon, HOME_COORDS.lat, HOME_COORDS.lon))
-          if (walkToHome <= 2) {
-            setRouteOptions([])
-            setTrains([])
-            setLastUpdate(new Date())
-            showStatus('success', 'You are home.')
-            return
-          }
-          if (walkToHome <= 12) {
-            setRouteOptions([
-              {
-                id: 'walk-home',
-                type: 'walk',
-                station: { name: 'Current location' },
-                walkMins: 0,
-                journeyMins: walkToHome,
-                destination: HOME_DESTINATION,
-                line: 'Walk',
-                operator: 'Walk',
-                mapsUrl: buildMapsUrl(location, HOME_DESTINATION, 'walking'),
-                departures: [],
-                serviceNote: 'Best option right now: walk home.',
-                reliableDuration: true,
-              },
-            ])
-            setTrains([])
-            setLastUpdate(new Date())
-            showStatus('success', 'You are already near home — showing walk route.')
-            return
-          }
+        // prefer walk-only and suppress route planning.
+        const walkToHome = Math.round(walkingMinutes(location.lat, location.lon, HOME_COORDS.lat, HOME_COORDS.lon))
+        if (walkToHome <= 2) {
+          setRouteOptions([])
+          setTrains([])
+          setLastUpdate(new Date())
+          showStatus('success', 'You are home.')
+          return
+        }
+        if (walkToHome <= 12) {
+          setRouteOptions([{
+            id: 'to-home',
+            durationMin: walkToHome,
+            depClock: null,
+            arrClock: null,
+            legs: [{
+              mode: 'walking', durMin: walkToHome, label: 'Walk home', lineName: null,
+              to: HOME_DESTINATION, depClock: null, arrClock: null,
+            }],
+          }])
+          setTrains([])
+          setLastUpdate(new Date())
+          showStatus('success', 'You are already near home — showing walk route.')
+          return
         }
 
-        // Distance to home — used to suppress irrelevant tube cards when the user is far away
-        const distToHomeKm = location
-          ? calculateDistance(location.lat, location.lon, HOME_COORDS.lat, HOME_COORDS.lon)
-          : null
-
-        // ── 1. GN Train only ─────────────────────────────────────────────────
-        let services = []
-        let gnFetchError = null
-        try {
-          services = await fetchDepartures(station.code, PALMERS_GREEN.code, { force })
-        } catch (gnErr) {
-          gnFetchError = gnErr.message
-          console.warn('[PG Train] GN API error for', station.code, ':', gnErr.message)
-        }
-        const trainOption = {
-          id: `train-${station.code}`,
-          type: 'train',
-          station: { code: station.code, name: station.name },
-          walkMins: effectiveTrainWalkMins,
-          journeyMins: JOURNEY_MINS_TO_PAL[station.code] || null,
-          destination: PALMERS_GREEN.name,
-          line: 'Great Northern',
-          operator: 'Great Northern',
-          mapsUrl: trainMapsUrl,
-          departures: services,
-          reliableDuration: true,
-          firstLeg: effectiveTrainWalkMins != null ? {
-            walkMins: effectiveTrainWalkMins,
-            stationName: station.name,
-          } : null,
-          ...(gnFetchError ? { serviceNote: 'Live train data unavailable — check National Rail app.' } : {}),
-        }
-
-        // ── 2. Tube + Train via Finsbury Park ────────────────────────────────
-        // Shows live GN departures from FPK → PAL.
-        // The user takes Piccadilly (any direction) to Finsbury Park, then boards here.
-        let tubePlusTrainOption = null
-        try {
-          const fpkServices = await fetchDepartures(TUBE_TRAIN_INTERCHANGE.crs, PALMERS_GREEN.code, { force })
-          tubePlusTrainOption = {
-            id: 'tube-train-fpk',
-            type: 'tube+train',
-            station: { name: TUBE_TRAIN_INTERCHANGE.name },
-            walkMins: null,
-            journeyMins: JOURNEY_MINS_TO_PAL[TUBE_TRAIN_INTERCHANGE.crs] || null,
-            destination: PALMERS_GREEN.name,
-            line: 'Great Northern',
-            tubeLine: 'Piccadilly',
-            operator: 'Great Northern / TfL',
-            mapsUrl: null,
-            departures: fpkServices,
-            serviceNote: 'Take Piccadilly line to Finsbury Park, then GN train',
-            reliableDuration: true,
-          }
-        } catch {
-          // Non-critical — omit if FPK fetch fails
-        }
-
-        // ── 3. Tube only — eastbound arrivals at near-home Piccadilly stations ─
-        // TUBE_STATIONS are the alight-here stations (Arnos Grove, Bounds Green, Wood Green).
-        // journeyMins = walk from that station to Palmers Green (the final leg home).
-        // walkMins = null because the boarding station is unknown.
-        // These cards are only useful near home (≤ 2 km). Further away the "board any Piccadilly"
-        // instruction gives no first leg, so suppress rather than show an incomplete card.
-        const tubeOptions = distToHomeKm != null && distToHomeKm > 2
-          ? []
-          : await Promise.all(
-              TUBE_STATIONS.map(async (ts) => {
-                let departures = []
-                let serviceNote
-                try {
-                  departures = await fetchTubeArrivals(ts.naptanId)
-                } catch {
-                  serviceNote = 'Check TfL app for live times'
-                }
-                const walkHome = Math.round(
-                  walkingMinutes(ts.lat, ts.lon, PALMERS_GREEN.lat, PALMERS_GREEN.lon)
-                )
-                return {
-                  id: `tube-${ts.name.replace(/\s+/g, '-').toLowerCase()}`,
-                  type: 'tube',
-                  station: { name: ts.name, line: ts.line },
-                  walkMins: null,          // boarding station unknown
-                  journeyMins: walkHome,   // walk from this station to home
-                  destination: HOME_DESTINATION,
-                  line: ts.line,
-                  operator: 'TfL',
-                  mapsUrl: null,
-                  departures,
-                  leaveInMins: null,
-                  serviceNote: serviceNote || 'Board at any Piccadilly line station toward Cockfosters',
-                  reliableDuration: false,
-                }
-              })
-            )
-
-        // ── 4. Silver Street Overground (east London users only) ─────────────
-        // Silver Street is east of Palmers Green. Only relevant when the user is
-        // in east London (Edmonton, Tottenham, Hackney, Liverpool Street area).
-        // Threshold: lon > -0.085 (east of the N13 / Palmers Green boundary).
-        // Platform 2 = northbound trains from Liverpool Street toward Cheshunt.
-        const isEastOfHome = location ? location.lon > -0.085 : false
-        const overgroundOptions = isEastOfHome
-          ? await Promise.all(
-              OVERGROUND_STATIONS.map(async (os) => {
-                let departures = []
-                let serviceNote
-                try {
-                  departures = await fetchOvergroundArrivals(os.naptanId, { platformFilter: os.inboundPlatform })
-                } catch {
-                  serviceNote = 'Check TfL app for live times'
-                }
-                const osWalkMins = location ? Math.round(walkingMinutes(location.lat, location.lon, os.lat, os.lon)) : null
-                return {
-                  id: `overground-${os.name.replace(/\s+/g, '-').toLowerCase()}`,
-                  type: 'overground',
-                  station: { name: os.name, line: os.line },
-                  walkMins: null,
-                  journeyMins: null,
-                  destination: HOME_DESTINATION,
-                  line: os.line,
-                  operator: 'London Overground',
-                  mapsUrl: null,
-                  departures,
-                  serviceNote: serviceNote || 'Alight here then bus 102 to Palmers Green',
-                  reliableDuration: false,
-                  firstLeg: osWalkMins != null ? {
-                    walkMins: osWalkMins,
-                    stationName: os.name,
-                  } : null,
-                }
-              })
-            )
-          : []
-
-        const allFiltered = [
-          trainOption,
-          ...(tubePlusTrainOption ? [tubePlusTrainOption] : []),
-          ...tubeOptions,
-          ...overgroundOptions,
-        ]
-          .filter((opt) => opt.walkMins == null || opt.walkMins <= 30)
-          .sort((a, b) => getOptionSortMinutes(a) - getOptionSortMinutes(b))
-
-        const gnOptions = allFiltered.filter((opt) => opt.type === 'train' || opt.type === 'tube+train')
-        const nonGnOptions = allFiltered.filter((opt) => opt.type !== 'train' && opt.type !== 'tube+train')
-
-        let displayOptions
-        if (gnOptions.length > 0) {
-          const preferred = { ...gnOptions[0], isPreferredGN: true }
-          displayOptions = nonGnOptions.length > 0 ? [preferred, nonGnOptions[0]] : [preferred]
-        } else {
-          displayOptions = allFiltered.slice(0, 2)
-        }
+        let journeyError = null
+        const [toHome, toStation] = await Promise.all([
+          fetchJourneys(location.lat, location.lon, HOME_POSTCODE).catch((e) => {
+            journeyError = e.message
+            return null
+          }),
+          fetchJourneys(location.lat, location.lon, PALMERS_GREEN.naptanId).catch((e) => {
+            journeyError = journeyError || e.message
+            return null
+          }),
+        ])
 
         if (!mountedRef.current || requestSeq.current !== seq) return
-        setRouteOptions(displayOptions)
-        setTrains(services.slice(0, 12))
+
+        const results = []
+        if (toHome) results.push({ ...toHome, id: 'to-home' })
+        if (toStation) results.push({ ...toStation, id: 'to-station' })
+
+        setRouteOptions(results)
+        setTrains([])
         setLastUpdate(new Date())
-        if (gnFetchError) {
-          showStatus('warning', 'Live GN data unavailable — showing alternative routes. Check National Rail app.')
+        if (results.length === 0) {
+          showStatus('error', journeyError ? `Journey planner unavailable: ${journeyError}` : 'No routes found. Check TfL app.')
+        } else if (results.length < 2) {
+          showStatus('warning', 'One route unavailable — showing what we have. Check TfL app.')
         } else {
-          showStatus('success', 'Connected. Showing live departures.')
+          showStatus('success', 'Connected. Showing live routes.')
         }
         return
       }
