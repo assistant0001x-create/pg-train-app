@@ -78,6 +78,24 @@ function parseMockLocation() {
   }
 }
 
+// ?mockUnavailable=station simulates the Palmers Green route being down in
+// DUMMY_MODE, for offline verification of the unavailable-route UI (no live
+// TfL key needed).
+function parseMockUnavailable() {
+  try {
+    return new URLSearchParams(window.location.search).get('mockUnavailable') === 'station'
+  } catch {
+    return false
+  }
+}
+
+// Builds one HOME-mode route entry. A null journey (no result, or the fetch
+// threw) becomes an { unavailable: true, reason } entry instead of being
+// silently dropped, so the UI can show it as unavailable with a reason.
+function buildRouteResult(id, journey, reason) {
+  return journey ? { ...journey, id, unavailable: false } : { id, unavailable: true, reason }
+}
+
 async function getUserLocation(mockOverride) {
   if (mockOverride) return mockOverride
   return new Promise((resolve, reject) => {
@@ -147,10 +165,16 @@ export function useTrainApp() {
       } else if (DUMMY_MODE) {
         // Offline demo — no API calls
         const { toHome, toStation } = getDummyJourneys()
-        setRouteOptions([toHome, toStation])
+        const stationDown = parseMockUnavailable()
+        setRouteOptions([
+          buildRouteResult('to-home', toHome, 'No route home currently available.'),
+          buildRouteResult('to-station', stationDown ? null : toStation, `${PALMERS_GREEN.name} station may be closed — no route currently available.`),
+        ])
         setTrains([])
         setLastUpdate(new Date())
-        showStatus('info', 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
+        showStatus('info', stationDown
+          ? `Demo mode — simulating ${PALMERS_GREEN.name} unavailable. Set VITE_DUMMY_MODE=false for live data.`
+          : 'Demo mode — showing dummy route data. Set VITE_DUMMY_MODE=false for live data.')
         return
       } else {
         // ── LIVE HOME mode ────────────────────────────────────────────────────
@@ -209,30 +233,35 @@ export function useTrainApp() {
           return
         }
 
-        let journeyError = null
-        const [toHome, toStation] = await Promise.all([
-          fetchJourneys(location.lat, location.lon, HOME_POSTCODE).catch((e) => {
-            journeyError = e.message
-            return null
-          }),
-          fetchJourneys(location.lat, location.lon, PALMERS_GREEN.naptanId).catch((e) => {
-            journeyError = journeyError || e.message
-            return null
-          }),
+        // allSettled (not all+shared-catch) so each route keeps its OWN
+        // failure reason instead of one clobbering the other's message.
+        const [toHomeResult, toStationResult] = await Promise.allSettled([
+          fetchJourneys(location.lat, location.lon, HOME_POSTCODE),
+          fetchJourneys(location.lat, location.lon, PALMERS_GREEN.naptanId),
         ])
 
         if (!mountedRef.current || requestSeq.current !== seq) return
 
-        const results = []
-        if (toHome) results.push({ ...toHome, id: 'to-home' })
-        if (toStation) results.push({ ...toStation, id: 'to-station' })
+        const results = [
+          buildRouteResult(
+            'to-home',
+            toHomeResult.status === 'fulfilled' ? toHomeResult.value : null,
+            toHomeResult.status === 'rejected' ? toHomeResult.reason.message : 'No route home currently available.'
+          ),
+          buildRouteResult(
+            'to-station',
+            toStationResult.status === 'fulfilled' ? toStationResult.value : null,
+            toStationResult.status === 'rejected' ? toStationResult.reason.message : `${PALMERS_GREEN.name} station may be closed — no route currently available.`
+          ),
+        ]
 
         setRouteOptions(results)
         setTrains([])
         setLastUpdate(new Date())
-        if (results.length === 0) {
-          showStatus('error', journeyError ? `Journey planner unavailable: ${journeyError}` : 'No routes found. Check TfL app.')
-        } else if (results.length < 2) {
+        const availableCount = results.filter((r) => !r.unavailable).length
+        if (availableCount === 0) {
+          showStatus('error', 'No routes available. Check TfL app.')
+        } else if (availableCount < 2) {
           showStatus('warning', 'One route unavailable — showing what we have. Check TfL app.')
         } else {
           showStatus('success', 'Connected. Showing live routes.')

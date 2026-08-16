@@ -406,6 +406,17 @@ button { font-family: inherit; background: none; border: 0; color: inherit; curs
   letter-spacing: 0.02em;
 }
 
+.rt-unavailable {
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: oklch(28% 0.06 80 / 0.2);
+  border: 1px solid oklch(50% 0.1 80 / 0.4);
+  color: var(--warn);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
 /* ── Route cards ────────────────────────────────────────────── */
 .rt-list { display: flex; flex-direction: column; gap: 10px; }
 .rt {

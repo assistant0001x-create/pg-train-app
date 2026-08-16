@@ -11,8 +11,10 @@ function PinIcon({ size = 12, color = 'currentColor' }) {
 }
 
 export default function HomeOptions({ routeOptions, isLoading, userLocation, mockLocation }) {
-  const toHome = routeOptions?.find((r) => r.id === 'to-home') ?? null
-  const toStation = routeOptions?.find((r) => r.id === 'to-station') ?? null
+  const toHomeOption = routeOptions?.find((r) => r.id === 'to-home') ?? null
+  const toStationOption = routeOptions?.find((r) => r.id === 'to-station') ?? null
+  const toHome = toHomeOption && !toHomeOption.unavailable ? toHomeOption : null
+  const toStation = toStationOption && !toStationOption.unavailable ? toStationOption : null
   const homeLabel = HOME_ADDRESS || '73 Hazelwood Lane, N13 5HE'
 
   if (isLoading && !toHome && !toStation) {
@@ -83,19 +85,32 @@ export default function HomeOptions({ routeOptions, isLoading, userLocation, moc
         </div>
       )}
 
+      {toHomeOption?.unavailable && (
+        <div className="rt-unavailable">
+          Route home: Currently unavailable ({toHomeOption.reason})
+        </div>
+      )}
+
       {toStation && (
         <div>
-          <div className="section-head" style={{ marginTop: 16 }}>
+          <div className="section-head" style={{ marginTop: toHome || toHomeOption?.unavailable ? 16 : 0 }}>
             <span className="section-title">Quickest to {PALMERS_GREEN.name} station</span>
             <span className="section-meta">TfL live</span>
           </div>
           <div className="rt-list">
-            <JourneyCard journey={toStation} />
+            {/* prominently displays as the sole available route when the home route is down */}
+            <JourneyCard journey={toStation} defaultExpanded={!toHome} />
           </div>
         </div>
       )}
 
-      {!toHome && !toStation && !isLoading && (
+      {toStationOption?.unavailable && (
+        <div className="rt-unavailable" style={{ marginTop: toHome || toHomeOption?.unavailable ? 16 : 0 }}>
+          Route via {PALMERS_GREEN.name}: Currently unavailable ({toStationOption.reason})
+        </div>
+      )}
+
+      {!isLoading && !toHome && !toStation && !toHomeOption?.unavailable && !toStationOption?.unavailable && (
         <div className="empty-state">No route options found. Tap refresh to try again.</div>
       )}
     </div>
